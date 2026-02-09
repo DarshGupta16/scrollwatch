@@ -1,12 +1,12 @@
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 let isBlocked = false;
 
 const showBlockOverlay = () => {
-  if (document.getElementById('scrollwatch-overlay')) return;
+  if (document.getElementById("scrollwatch-overlay")) return;
 
-  const overlay = document.createElement('div');
-  overlay.id = 'scrollwatch-overlay';
+  const overlay = document.createElement("div");
+  overlay.id = "scrollwatch-overlay";
   overlay.style.cssText = `
     position: fixed;
     top: 0;
@@ -55,7 +55,7 @@ const showBlockOverlay = () => {
 
 // Listen for block message
 browser.runtime.onMessage.addListener((message) => {
-  if (message.type === 'BLOCK_PAGE') {
+  if (message.type === "BLOCK_PAGE") {
     isBlocked = true;
     showBlockOverlay();
   }
@@ -63,18 +63,31 @@ browser.runtime.onMessage.addListener((message) => {
 
 // Check for activity every second
 setInterval(() => {
-  if (isBlocked) return;
-  
+  if (isBlocked) {
+    // Poll for unblock
+    browser.runtime
+      .sendMessage({ type: "CHECK_STATUS" })
+      .then((response) => {
+        if (!response?.isBlocked) {
+          window.location.reload();
+        }
+      })
+      .catch(() => {
+        // Ignore errors
+      });
+    return;
+  }
+
   // If the page is visible (user is looking at it), count it as active time
   if (!document.hidden) {
-    browser.runtime.sendMessage({ type: 'ACTIVITY_HEARTBEAT' }).catch(() => {
+    browser.runtime.sendMessage({ type: "ACTIVITY_HEARTBEAT" }).catch(() => {
       // Ignore errors (e.g. extension context invalidated)
     });
   }
 }, 1000);
 
 // Check if already blocked on load
-browser.runtime.sendMessage({ type: 'CHECK_STATUS' }).then((response) => {
+browser.runtime.sendMessage({ type: "CHECK_STATUS" }).then((response) => {
   if (response?.isBlocked) {
     isBlocked = true;
     showBlockOverlay();

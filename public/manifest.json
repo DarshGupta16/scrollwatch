@@ -3,7 +3,7 @@
   "name": "ScrollWatch",
   "version": "1.0.0",
   "description": "Prevent doomscrolling by setting custom rules for websites.",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "alarms"],
   "action": {
     "default_popup": "index.html",
     "default_icon": "icon.png"

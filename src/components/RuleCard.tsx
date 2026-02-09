@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Rule } from "../utils/storage";
 import { formatTime } from "../utils/time";
 
@@ -10,7 +11,27 @@ interface RuleCardProps {
  * Card displaying a single rule with progress bar
  */
 export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
-  const progress = Math.min(
+  const [timeUntilReset, setTimeUntilReset] = useState(0);
+
+  useEffect(() => {
+    if (!rule.isBlocked) {
+      setTimeUntilReset(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const resetTime = rule.lastReset + rule.resetInterval * 1000;
+      const left = Math.max(0, Math.floor((resetTime - now) / 1000));
+      setTimeUntilReset(left);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [rule.isBlocked, rule.lastReset, rule.resetInterval]);
+
+  const consumptionProgress = Math.min(
     100,
     (rule.consumedTime / rule.allowedDuration) * 100,
   );
@@ -37,21 +58,51 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
         </button>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex justify-between text-xs font-mono text-muted uppercase">
-          <span>Consumption</span>
-          <span>
-            {formatTime(rule.consumedTime)} / {formatTime(rule.allowedDuration)}
-          </span>
+      <div className="space-y-4">
+        {/* Consumption Bar */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs font-mono text-muted uppercase">
+            <span>Consumption</span>
+            <span>
+              {formatTime(rule.consumedTime)} /{" "}
+              {formatTime(rule.allowedDuration)}
+            </span>
+          </div>
+          <div className="h-2 bg-bg border border-border w-full">
+            <div
+              className={`h-full transition-all duration-300 ${rule.isBlocked ? "bg-red-500" : "bg-white"}`}
+              style={{ width: `${consumptionProgress}%` }}
+            />
+          </div>
         </div>
-        <div className="h-2 bg-bg border border-border w-full">
-          <div
-            className={`h-full ${rule.isBlocked ? "bg-red-500" : "bg-white"}`}
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <div className="text-right text-xs text-muted mt-1">
-          RESETS EVERY {formatTime(rule.resetInterval)}
+
+        {/* Reset Timer Bar */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs font-mono text-muted uppercase">
+            <span>Reset In</span>
+            <span>
+              {rule.isBlocked
+                ? formatTime(timeUntilReset)
+                : "WAITING FOR BLOCK"}
+            </span>
+          </div>
+          <div className="h-2 bg-bg border border-border w-full">
+            <div
+              className={`h-full transition-all duration-300 ${
+                rule.isBlocked ? "bg-blue-500" : "bg-blue-500/30"
+              }`}
+              style={{
+                width: `${
+                  rule.isBlocked
+                    ? (timeUntilReset / rule.resetInterval) * 100
+                    : 100
+                }%`,
+              }}
+            />
+          </div>
+          <div className="text-right text-[10px] text-muted uppercase">
+            Interval: {formatTime(rule.resetInterval)}
+          </div>
         </div>
       </div>
     </div>

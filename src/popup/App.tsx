@@ -1,88 +1,35 @@
-import React, { useState, useEffect, useRef } from "react";
-import { getStorage, Rule } from "../utils/storage";
+import React, { useState, useEffect } from "react";
 import browser from "webextension-polyfill";
+import { useWatchlist } from "../hooks/useWatchlist";
+import { RuleCard } from "../components/RuleCard";
 
 const App = () => {
-  const [stats, setStats] = useState({ blocks: 0, savedMinutes: 0 });
-  const [currentSite, setCurrentSite] = useState<{
-    domain: string;
-    rule: Rule | null;
-  }>({ domain: "", rule: null });
+  const { watchlist, stats, deleteRule } = useWatchlist(1000); // Faster refresh for popup
+  const [currentDomain, setCurrentDomain] = useState<string>("");
 
-  // Local interpolation state for smooth timer
-  const syncPointRef = useRef<{ time: number; value: number }>({
-    time: Date.now(),
-    value: 0,
-  });
-  const [displayTime, setDisplayTime] = useState(0);
-
-  // Fast local tick for smooth display (every 100ms)
   useEffect(() => {
-    const tick = setInterval(() => {
-      if (currentSite.rule && !currentSite.rule.isBlocked) {
-        const elapsed = (Date.now() - syncPointRef.current.time) / 1000;
-        setDisplayTime(syncPointRef.current.value + elapsed);
+    // Get current tab's domain
+    const getCurrentTab = async () => {
+      try {
+        const tabs = await browser.tabs.query({
+          active: true,
+          currentWindow: true,
+        });
+        if (tabs[0]?.url) {
+          const url = new URL(tabs[0].url);
+          setCurrentDomain(url.hostname);
+        }
+      } catch {
+        // Ignore errors
       }
-    }, 100);
-    return () => clearInterval(tick);
-  }, [currentSite.rule?.isBlocked]);
-
-  // Storage sync (every 3 seconds for accuracy, plus initial load)
-  useEffect(() => {
-    loadData(); // Initial load
-    const sync = setInterval(loadData, 3000);
-    return () => clearInterval(sync);
+    };
+    getCurrentTab();
   }, []);
 
-  const loadData = async () => {
-    const data = await getStorage();
-    const blocks = data.stats?.totalBlocks || 0;
-    setStats({
-      blocks,
-      savedMinutes: blocks * 15,
-    });
-
-    // Get current tab's domain
-    try {
-      const tabs = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tabs[0]?.url) {
-        const url = new URL(tabs[0].url);
-        const domain = url.hostname;
-        const rule = data.watchlist[domain] || null;
-        setCurrentSite({ domain, rule });
-
-        // Update sync point for interpolation
-        if (rule) {
-          syncPointRef.current = { time: Date.now(), value: rule.consumedTime };
-          setDisplayTime(rule.consumedTime);
-        }
-      }
-    } catch {
-      // Ignore errors (e.g., chrome:// pages)
-    }
-  };
+  const currentRule = currentDomain ? watchlist[currentDomain] : null;
 
   const openDashboard = () => {
     browser.runtime.openOptionsPage();
-  };
-
-  const formatTime = (seconds: number) => {
-    const totalSeconds = Math.floor(seconds);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    return `${h > 0 ? h + "h " : ""}${m}m ${s}s`;
-  };
-
-  const getProgress = () => {
-    if (!currentSite.rule) return 0;
-    return Math.min(
-      100,
-      (displayTime / currentSite.rule.allowedDuration) * 100,
-    );
   };
 
   return (
@@ -100,52 +47,21 @@ const App = () => {
       </header>
 
       {/* Current Site Status */}
-      {currentSite.domain && (
-        <div className="mb-6 bg-surface border border-border p-4">
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <h3 className="text-lg font-bold tracking-tight truncate max-w-[180px]">
-                {currentSite.domain}
+      {/* Current Site Status */}
+      {currentDomain && (
+        <div className="mb-6">
+          {currentRule ? (
+            <RuleCard rule={currentRule} onDelete={deleteRule} />
+          ) : (
+            <div className="bg-surface border border-border p-4">
+              <h3 className="text-lg font-bold tracking-tight truncate mb-2">
+                {currentDomain}
               </h3>
-              <div className="flex items-center gap-2 mt-1">
-                {currentSite.rule ? (
-                  <>
-                    <div
-                      className={`w-2 h-2 ${currentSite.rule.isBlocked ? "bg-red-500" : "bg-green-500 animate-pulse"}`}
-                    ></div>
-                    <span className="text-xs text-muted uppercase tracking-widest">
-                      {currentSite.rule.isBlocked ? "LOCKED" : "MONITORING"}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 bg-muted"></div>
-                    <span className="text-xs text-muted uppercase tracking-widest">
-                      NOT TRACKED
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {currentSite.rule && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-mono text-muted uppercase">
-                <span>Usage</span>
-                <span>
-                  {formatTime(displayTime)} /{" "}
-                  {formatTime(currentSite.rule.allowedDuration)}
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-muted"></div>
+                <span className="text-xs text-muted uppercase tracking-widest">
+                  NOT TRACKED
                 </span>
-              </div>
-              <div className="h-2 bg-bg border border-border w-full">
-                <div
-                  className={`h-full transition-all duration-100 ${currentSite.rule.isBlocked ? "bg-red-500" : "bg-white"}`}
-                  style={{ width: `${getProgress()}%` }}
-                />
-              </div>
-              <div className="text-right text-xs text-muted">
-                Resets every {formatTime(currentSite.rule.resetInterval)}
               </div>
             </div>
           )}
@@ -156,7 +72,7 @@ const App = () => {
       <div className="flex-1 space-y-4">
         <div>
           <div className="text-3xl font-bold text-text leading-none">
-            {stats.blocks}
+            {stats.totalBlocks}
           </div>
           <div className="text-xs text-muted uppercase tracking-widest mt-1">
             Blocks Today
@@ -165,9 +81,7 @@ const App = () => {
 
         <div>
           <div className="text-3xl font-bold text-text leading-none">
-            {stats.savedMinutes >= 60
-              ? (stats.savedMinutes / 60).toFixed(1) + "h"
-              : stats.savedMinutes + "m"}
+            {((stats.totalBlocks * 15) / 60).toFixed(1)}h
           </div>
           <div className="text-xs text-muted uppercase tracking-widest mt-1">
             Time Reclaimed

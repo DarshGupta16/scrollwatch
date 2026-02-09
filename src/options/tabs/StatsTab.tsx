@@ -23,7 +23,7 @@ export const StatsTab = ({ stats, rules }: StatsTabProps) => {
         <div className="bg-surface border border-border p-8 text-center">
           <div className="text-6xl font-bold mb-2">
             {totalTimeSaved >= 60
-              ? Math.floor(totalTimeSaved / 60) + "h"
+              ? (totalTimeSaved / 60).toFixed(1) + "h"
               : totalTimeSaved + "m"}
           </div>
           <div className="text-xs text-muted uppercase tracking-widest">
