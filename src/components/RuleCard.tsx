@@ -1,4 +1,3 @@
-import React from "react";
 import { Rule } from "../utils/storage";
 import { formatTime } from "../utils/time";
 
@@ -10,7 +9,7 @@ interface RuleCardProps {
 /**
  * Card displaying a single rule with progress bar
  */
-export const RuleCard: React.FC<RuleCardProps> = ({ rule, onDelete }) => {
+export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
   const progress = Math.min(
     100,
     (rule.consumedTime / rule.allowedDuration) * 100,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getStorage, setStorage, Rule, StorageData } from "../utils/storage";
+import { getStorage, setStorage, Rule } from "../utils/storage";
 import { toSeconds } from "../utils/time";
 import type { TimeHMS } from "../utils/time";
 
