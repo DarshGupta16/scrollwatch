@@ -24,55 +24,66 @@ const checkAndResetRules = async () => {
 // Check every minute
 setInterval(checkAndResetRules, 60000);
 
+// Keep track of active sessions
+const activeSessions: Record<number, { domain: string, lastHeartbeat: number }> = {};
+
 browser.runtime.onMessage.addListener((message, sender) => {
-  if (message.type === 'SCROLL_ACTIVITY') {
-    handleScrollActivity(sender.tab?.url);
+  if (message.type === 'ACTIVITY_HEARTBEAT') {
+    handleHeartbeat(sender.tab?.id, sender.tab?.url);
   } else if (message.type === 'CHECK_STATUS') {
     return checkStatus(sender.tab?.url);
   }
 });
 
-const checkStatus = async (url?: string) => {
-  if (!url) return { isBlocked: false };
+const handleHeartbeat = async (tabId?: number, url?: string) => {
+  if (!tabId || !url) return;
+  
   try {
     const domain = new URL(url).hostname;
+    const now = Date.now();
     const data = await getStorage();
-    return { isBlocked: !!data.watchlist[domain]?.isBlocked };
-  } catch (e) {
-    return { isBlocked: false };
-  }
-};
+    const rule = data.watchlist[domain];
 
-const handleScrollActivity = async (url?: string) => {
-  if (!url) return;
-  
-  const domain = new URL(url).hostname;
-  const data = await getStorage();
-  const rule = data.watchlist[domain];
-
-  if (rule && !rule.isBlocked) {
-    rule.consumedTime += 1;
-    
-    if (rule.consumedTime >= rule.allowedDuration) {
-      rule.isBlocked = true;
+    if (rule && !rule.isBlocked) {
+      const session = activeSessions[tabId];
       
-      // Update stats
-      if (!data.stats) {
-        data.stats = { totalBlocks: 0, startTime: Date.now() };
-      }
-      data.stats.totalBlocks += 1;
-
-      // Notify all tabs of this domain
-      const tabs = await browser.tabs.query({});
-      tabs.forEach(tab => {
-        if (tab.url && new URL(tab.url).hostname === domain) {
-          browser.tabs.sendMessage(tab.id!, { type: 'BLOCK_PAGE' });
+      if (session && session.domain === domain) {
+        // Calculate elapsed time since last heartbeat (max 5s to prevent jumps)
+        const elapsed = Math.min((now - session.lastHeartbeat) / 1000, 5);
+        rule.consumedTime += elapsed;
+        
+        if (rule.consumedTime >= rule.allowedDuration) {
+          rule.isBlocked = true;
+          if (!data.stats) data.stats = { totalBlocks: 0, startTime: Date.now() };
+          data.stats.totalBlocks += 1;
+          
+          // Notify all tabs
+          const tabs = await browser.tabs.query({});
+          tabs.forEach(tab => {
+            if (tab.url && new URL(tab.url).hostname === domain) {
+              browser.tabs.sendMessage(tab.id!, { type: 'BLOCK_PAGE' });
+            }
+          });
         }
-      });
+      }
+      
+      activeSessions[tabId] = { domain, lastHeartbeat: now };
+      await setStorage(data);
     }
-    await setStorage(data);
+  } catch (e) {
+    console.error('Heartbeat error:', e);
   }
 };
+
+// Cleanup inactive sessions
+setInterval(() => {
+  const now = Date.now();
+  for (const tabId in activeSessions) {
+    if (now - activeSessions[tabId].lastHeartbeat > 10000) {
+      delete activeSessions[tabId];
+    }
+  }
+}, 10000);
 
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {

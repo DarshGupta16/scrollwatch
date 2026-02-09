@@ -61,18 +61,17 @@ browser.runtime.onMessage.addListener((message) => {
   }
 });
 
-// Detect scrolling
-let scrollTimeout: any;
-window.addEventListener('scroll', () => {
+// Check for activity every second
+setInterval(() => {
   if (isBlocked) return;
-
-  if (!scrollTimeout) {
-    browser.runtime.sendMessage({ type: 'SCROLL_ACTIVITY' });
-    scrollTimeout = setTimeout(() => {
-      scrollTimeout = null;
-    }, 1000); // Send once per second while scrolling
+  
+  // If the page is visible (user is looking at it), count it as active time
+  if (!document.hidden) {
+    browser.runtime.sendMessage({ type: 'ACTIVITY_HEARTBEAT' }).catch(() => {
+      // Ignore errors (e.g. extension context invalidated)
+    });
   }
-}, { passive: true });
+}, 1000);
 
 // Check if already blocked on load
 browser.runtime.sendMessage({ type: 'CHECK_STATUS' }).then((response) => {
