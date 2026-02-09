@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+PLAN.md
+DEPLOY.md
+*.log
+.DS_Store
