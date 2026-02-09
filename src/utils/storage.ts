@@ -10,13 +10,22 @@ export interface Rule {
   isBlocked: boolean;
 }
 
+export interface Stats {
+  totalBlocks: number;
+  startTime: number;
+}
+
 export interface StorageData {
   watchlist: Record<string, Rule>;
+  stats: Stats;
 }
 
 export const getStorage = async (): Promise<StorageData> => {
   const data = await browser.storage.local.get('scrollwatch');
-  return data.scrollwatch || { watchlist: {} };
+  return data.scrollwatch || { 
+    watchlist: {}, 
+    stats: { totalBlocks: 0, startTime: Date.now() } 
+  };
 };
 
 export const setStorage = async (data: StorageData): Promise<void> => {

@@ -55,6 +55,13 @@ const handleScrollActivity = async (url?: string) => {
     
     if (rule.consumedTime >= rule.allowedDuration) {
       rule.isBlocked = true;
+      
+      // Update stats
+      if (!data.stats) {
+        data.stats = { totalBlocks: 0, startTime: Date.now() };
+      }
+      data.stats.totalBlocks += 1;
+
       // Notify all tabs of this domain
       const tabs = await browser.tabs.query({});
       tabs.forEach(tab => {
