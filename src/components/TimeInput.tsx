@@ -53,6 +53,8 @@ export const TimeInput = ({ label, value, onChange }: TimeInputProps) => {
     setHours(h.toString().padStart(2, "0"));
     setMinutes(m.toString().padStart(2, "0"));
     setSeconds(s.toString().padStart(2, "0"));
+
+    onChange({ h, m, s });
   };
 
   const inputClass =

@@ -46,13 +46,17 @@ const devStorage: StorageData = {
 // Lazy load browser API only when needed
 let browserApi: typeof import("webextension-polyfill") | null = null;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const chrome: any;
+
 const getBrowser = async () => {
   if (browserApi) return browserApi;
 
   try {
     // Check if we're in extension context first
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-      browserApi = await import("webextension-polyfill");
+      const module = await import("webextension-polyfill");
+      browserApi = module.default;
       return browserApi;
     }
   } catch {
@@ -67,8 +71,11 @@ export const getStorage = async (): Promise<StorageData> => {
 
   if (!browser) {
     // Dev mode: use localStorage
-    const stored = localStorage.getItem("scrollwatch-dev");
-    return stored ? JSON.parse(stored) : devStorage;
+    if (typeof localStorage !== "undefined") {
+      const stored = localStorage.getItem("scrollwatch-dev");
+      return stored ? JSON.parse(stored) : devStorage;
+    }
+    return devStorage;
   }
 
   const data = await browser.storage.local.get("scrollwatch");
@@ -84,7 +91,9 @@ export const setStorage = async (data: StorageData): Promise<void> => {
   const browser = await getBrowser();
 
   if (!browser) {
-    localStorage.setItem("scrollwatch-dev", JSON.stringify(data));
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("scrollwatch-dev", JSON.stringify(data));
+    }
     return;
   }
 
