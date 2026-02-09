@@ -11,8 +11,8 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "webextension-polyfill": "^0.12.0"

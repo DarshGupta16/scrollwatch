@@ -1,3 +1,4 @@
+import browser from 'webextension-polyfill';
 import { getStorage, setStorage, Rule } from '../utils/storage';
 
 const checkAndResetRules = async () => {
@@ -23,12 +24,11 @@ const checkAndResetRules = async () => {
 // Check every minute
 setInterval(checkAndResetRules, 60000);
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === 'SCROLL_ACTIVITY') {
     handleScrollActivity(sender.tab?.url);
   } else if (message.type === 'CHECK_STATUS') {
-    checkStatus(sender.tab?.url).then(sendResponse);
-    return true; // Keep channel open for async
+    return checkStatus(sender.tab?.url);
   }
 });
 
@@ -51,29 +51,28 @@ const handleScrollActivity = async (url?: string) => {
   const rule = data.watchlist[domain];
 
   if (rule && !rule.isBlocked) {
-    rule.consumedTime += 1; // Increment by 1 second (this is a simplified tick)
+    rule.consumedTime += 1;
     
     if (rule.consumedTime >= rule.allowedDuration) {
       rule.isBlocked = true;
       // Notify all tabs of this domain
-      chrome.tabs.query({}, (tabs) => {
-        tabs.forEach(tab => {
-          if (tab.url && new URL(tab.url).hostname === domain) {
-            chrome.tabs.sendMessage(tab.id!, { type: 'BLOCK_PAGE' });
-          }
-        });
+      const tabs = await browser.tabs.query({});
+      tabs.forEach(tab => {
+        if (tab.url && new URL(tab.url).hostname === domain) {
+          browser.tabs.sendMessage(tab.id!, { type: 'BLOCK_PAGE' });
+        }
       });
     }
     await setStorage(data);
   }
 };
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
     const domain = new URL(tab.url).hostname;
     const data = await getStorage();
     if (data.watchlist[domain]?.isBlocked) {
-      chrome.tabs.sendMessage(tabId, { type: 'BLOCK_PAGE' });
+      browser.tabs.sendMessage(tabId, { type: 'BLOCK_PAGE' });
     }
   }
 });

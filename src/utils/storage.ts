@@ -1,3 +1,5 @@
+import browser from 'webextension-polyfill';
+
 export interface Rule {
   id: string;
   domain: string;
@@ -13,12 +15,12 @@ export interface StorageData {
 }
 
 export const getStorage = async (): Promise<StorageData> => {
-  const data = await chrome.storage.local.get('scrollwatch');
+  const data = await browser.storage.local.get('scrollwatch');
   return data.scrollwatch || { watchlist: {} };
 };
 
 export const setStorage = async (data: StorageData): Promise<void> => {
-  await chrome.storage.local.set({ scrollwatch: data });
+  await browser.storage.local.set({ scrollwatch: data });
 };
 
 export const updateRule = async (domain: string, updates: Partial<Rule>): Promise<void> => {

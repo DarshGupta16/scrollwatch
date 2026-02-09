@@ -1,3 +1,5 @@
+import browser from 'webextension-polyfill';
+
 let isBlocked = false;
 
 const showBlockOverlay = () => {
@@ -46,7 +48,7 @@ const showBlockOverlay = () => {
 };
 
 // Listen for block message
-chrome.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'BLOCK_PAGE') {
     isBlocked = true;
     showBlockOverlay();
@@ -59,7 +61,7 @@ window.addEventListener('scroll', () => {
   if (isBlocked) return;
 
   if (!scrollTimeout) {
-    chrome.runtime.sendMessage({ type: 'SCROLL_ACTIVITY' });
+    browser.runtime.sendMessage({ type: 'SCROLL_ACTIVITY' });
     scrollTimeout = setTimeout(() => {
       scrollTimeout = null;
     }, 1000); // Send once per second while scrolling
@@ -67,7 +69,7 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 
 // Check if already blocked on load
-chrome.runtime.sendMessage({ type: 'CHECK_STATUS' }, (response) => {
+browser.runtime.sendMessage({ type: 'CHECK_STATUS' }).then((response) => {
   if (response?.isBlocked) {
     isBlocked = true;
     showBlockOverlay();
