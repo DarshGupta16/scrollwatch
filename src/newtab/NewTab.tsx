@@ -1,39 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { getStorage } from '../utils/storage';
 
-const GREETINGS = [
-  "Doomscrolling is for amateurs.",
-  "Time is your only non-renewable resource.",
-  "Create more than you consume.",
-  "Focus is the new IQ.",
-  "Be the pilot, not the passenger.",
-  "Scroll less, live more.",
-  "Your future self is watching.",
-  "Discipline is freedom.",
-  "What could you build right now?",
-  "Stay hungry, stay foolish, stay focused."
+const QUOTES = [
+  "CONSUMPTION IS A CHOICE.",
+  "TIME IS NON-REFUNDABLE.",
+  "CREATE. DON'T SCROLL.",
+  "THE ALGORITHM IS NOT YOUR FRIEND.",
+  "FOCUS IS CURRENCY.",
+  "DISCIPLINE EQUALS FREEDOM.",
+  "WHAT ARE YOU BUILDING?",
+  "SILENCE THE NOISE.",
+  "YOU ARE WHAT YOU DO REPEATEDLY.",
+  "DO NOT YIELD TO DISTRACTION."
 ];
 
 const NewTab = () => {
   const [stats, setStats] = useState({ savedMinutes: 0, blocks: 0 });
-  const [greeting, setGreeting] = useState('');
+  const [quote, setQuote] = useState('');
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
-    // Set random greeting
-    setGreeting(GREETINGS[Math.floor(Math.random() * GREETINGS.length)]);
-
-    // Update clock
+    setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
     const timer = setInterval(() => setTime(new Date()), 1000);
-
-    // Load stats
+    
     getStorage().then(data => {
       const blocks = data.stats?.totalBlocks || 0;
-      // Assumption: Each block saves ~15 minutes of doomscrolling
-      setStats({
-        blocks,
-        savedMinutes: blocks * 15
-      });
+      setStats({ blocks, savedMinutes: blocks * 15 });
     });
 
     return () => clearInterval(timer);
@@ -41,51 +33,57 @@ const NewTab = () => {
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
     });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8 text-center selection:bg-primary selection:text-white">
-      <div className="absolute top-8 left-8">
-        <h1 className="text-xl font-black tracking-tighter text-gray-900 flex items-center gap-2">
-          <span className="text-2xl">⏳</span> ScrollWatch
-        </h1>
+    <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-8 selection:bg-white selection:text-black">
+      <div className="absolute top-8 left-8 border border-border px-4 py-2">
+        <h1 className="text-sm font-bold tracking-widest text-muted uppercase">ScrollWatch System</h1>
       </div>
 
-      <main className="max-w-4xl w-full animate-fade-in-up">
-        <div className="mb-12">
-          <h2 className="text-[8rem] leading-none font-black text-transparent bg-clip-text bg-gradient-to-br from-gray-900 to-gray-600 tracking-tighter select-none">
+      <main className="w-full max-w-5xl">
+        <div className="text-center mb-24">
+          <h2 className="text-[12rem] md:text-[16rem] leading-none font-bold text-white tracking-tighter select-none font-mono">
             {formatTime(time)}
           </h2>
-          <p className="text-2xl text-gray-500 font-medium mt-4 italic">
-            "{greeting}"
-          </p>
+          <div className="inline-block border-l-2 border-accent pl-6 text-left">
+            <p className="text-xl md:text-2xl text-muted font-bold uppercase tracking-widest max-w-xl">
+              {quote}
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-          <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:transform hover:scale-[1.02] transition-all duration-300">
-            <div className="text-4xl font-black text-primary mb-2">
+        <div className="grid grid-cols-2 gap-px bg-border border border-border max-w-2xl mx-auto">
+          <div className="bg-bg p-12 text-center group hover:bg-surface transition-colors">
+            <div className="text-6xl font-bold text-white mb-2 font-mono">
               {stats.savedMinutes >= 60 
-                ? `${(stats.savedMinutes / 60).toFixed(1)}h` 
-                : `${stats.savedMinutes}m`}
+                ? (stats.savedMinutes / 60).toFixed(1) + 'H' 
+                : stats.savedMinutes + 'M'}
             </div>
-            <div className="text-sm font-bold text-gray-400 uppercase tracking-widest">Time Reclaimed</div>
+            <div className="text-xs font-bold text-muted uppercase tracking-[0.2em] group-hover:text-accent transition-colors">
+              Time Reclaimed
+            </div>
           </div>
 
-          <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:transform hover:scale-[1.02] transition-all duration-300">
-            <div className="text-4xl font-black text-accent mb-2">
+          <div className="bg-bg p-12 text-center group hover:bg-surface transition-colors">
+            <div className="text-6xl font-bold text-white mb-2 font-mono">
               {stats.blocks}
             </div>
-            <div className="text-sm font-bold text-gray-400 uppercase tracking-widest">Doomscrolls Blocked</div>
+            <div className="text-xs font-bold text-muted uppercase tracking-[0.2em] group-hover:text-accent transition-colors">
+              Interventions
+            </div>
           </div>
         </div>
       </main>
 
-      <footer className="absolute bottom-8 text-gray-300 text-sm font-medium">
-        You are strictly your habits.
+      <footer className="absolute bottom-8 w-full text-center">
+        <div className="inline-block px-4 py-1 border border-border text-[10px] text-muted uppercase tracking-widest">
+          Status: Operational
+        </div>
       </footer>
     </div>
   );

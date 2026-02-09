@@ -5,7 +5,17 @@
   "description": "Prevent doomscrolling by setting custom rules for websites.",
   "permissions": ["storage", "tabs"],
   "action": {
-    "default_popup": "index.html"
+    "default_popup": "index.html",
+    "default_icon": "icon.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
   },
   "chrome_url_overrides": {
     "newtab": "newtab.html"

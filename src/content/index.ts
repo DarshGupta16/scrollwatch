@@ -13,33 +13,39 @@ const showBlockOverlay = () => {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(255, 255, 255, 0.98);
+    background: #050505;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 2147483647;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: #1f2937;
+    font-family: 'Courier New', Courier, monospace;
+    color: #eeeeee;
+    text-transform: uppercase;
   `;
 
   overlay.innerHTML = `
-    <div style="text-align: center; padding: 2rem; border-radius: 1rem; background: white; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
-      <div style="font-size: 5rem; margin-bottom: 1rem;">🔒</div>
-      <h1 style="font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; color: #f43f5e;">Scrolling Locked!</h1>
-      <p style="font-size: 1.125rem; color: #4b5563; max-width: 300px; margin: 0 auto;">
-        You've hit your limit. Come back after your reset duration.
+    <div style="border: 1px solid #333; padding: 4rem; background: #111; max-width: 600px; width: 100%; text-align: center;">
+      <div style="font-size: 4rem; font-weight: bold; margin-bottom: 2rem; letter-spacing: -2px;">LOCKED</div>
+      
+      <div style="height: 1px; background: #333; margin: 2rem 0;"></div>
+      
+      <p style="font-size: 1.2rem; color: #666; margin-bottom: 2rem; letter-spacing: 2px; line-height: 1.6;">
+        PROTOCOL ENFORCED.<br>
+        LIMIT EXCEEDED FOR THIS DOMAIN.
       </p>
-      <div style="margin-top: 2rem; height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden;">
-        <div style="width: 100%; height: 100%; background: #6366f1; animation: pulse 2s infinite;"></div>
+
+      <div style="display: flex; justify-content: center; gap: 1rem;">
+        <div style="width: 10px; height: 10px; background: #ff3333;"></div>
+        <div style="width: 10px; height: 10px; background: #ff3333;"></div>
+        <div style="width: 10px; height: 10px; background: #ff3333;"></div>
+      </div>
+      
+      <div style="margin-top: 3rem; font-size: 0.8rem; color: #444;">
+        ScrollWatch System v2.0
       </div>
     </div>
     <style>
-      @keyframes pulse {
-        0% { opacity: 1; }
-        50% { opacity: 0.5; }
-        100% { opacity: 1; }
-      }
       body { overflow: hidden !important; }
     </style>
   `;
