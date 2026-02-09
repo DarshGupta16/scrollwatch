@@ -8,11 +8,12 @@ const checkAndResetRules = async () => {
 
   for (const domain in data.watchlist) {
     const rule = data.watchlist[domain];
-    // Only reset if the rule is actually blocked (cooldown logic)
-    if (rule.isBlocked && now - rule.lastReset >= rule.resetInterval * 1000) {
+    // Constant Interval: Reset if time passed, regardless of block status
+    if (now - rule.lastReset >= rule.resetInterval * 1000) {
       rule.consumedTime = 0;
       rule.isBlocked = false;
-      // lastReset is irrelevant once unblocked until next block
+      // Reset logic: advance lastReset to now (or conceptually start of new interval)
+      rule.lastReset = now;
       changed = true;
     }
   }
@@ -73,8 +74,8 @@ const handleHeartbeat = async (tabId?: number, url?: string) => {
 
         if (rule.consumedTime >= rule.allowedDuration) {
           rule.isBlocked = true;
-          // Start the cooldown timer
-          rule.lastReset = now;
+          // Constant Interval: Do NOT reset lastReset on block
+          // rule.lastReset = now;
 
           if (!data.stats)
             data.stats = { totalBlocks: 0, startTime: Date.now() };
@@ -105,12 +106,13 @@ const checkStatus = async (url?: string) => {
     const data = await getStorage();
     const rule = data.watchlist[domain];
 
-    if (rule?.isBlocked) {
-      // Lazy reset: Check if we should unblock right now
+    if (rule) {
+      // Lazy reset: Check if we should reset right now
       const now = Date.now();
       if (now - rule.lastReset >= rule.resetInterval * 1000) {
         rule.consumedTime = 0;
         rule.isBlocked = false;
+        rule.lastReset = now; // Update timestamp
         await setStorage(data); // Save the unblock immediately
       }
     }

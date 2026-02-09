@@ -14,11 +14,6 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
   const [timeUntilReset, setTimeUntilReset] = useState(0);
 
   useEffect(() => {
-    if (!rule.isBlocked) {
-      setTimeUntilReset(0);
-      return;
-    }
-
     const updateTimer = () => {
       const now = Date.now();
       const resetTime = rule.lastReset + rule.resetInterval * 1000;
@@ -29,7 +24,7 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [rule.isBlocked, rule.lastReset, rule.resetInterval]);
+  }, [rule.lastReset, rule.resetInterval]);
 
   const consumptionProgress = Math.min(
     100,
@@ -80,23 +75,15 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-mono text-muted uppercase">
             <span>Reset In</span>
-            <span>
-              {rule.isBlocked
-                ? formatTime(timeUntilReset)
-                : "WAITING FOR BLOCK"}
-            </span>
+            <span>{formatTime(timeUntilReset)}</span>
           </div>
           <div className="h-2 bg-bg border border-border w-full">
             <div
               className={`h-full transition-all duration-300 ${
-                rule.isBlocked ? "bg-blue-500" : "bg-blue-500/30"
+                rule.isBlocked ? "bg-blue-500" : "bg-blue-500/50"
               }`}
               style={{
-                width: `${
-                  rule.isBlocked
-                    ? (timeUntilReset / rule.resetInterval) * 100
-                    : 100
-                }%`,
+                width: `${(timeUntilReset / rule.resetInterval) * 100}%`,
               }}
             />
           </div>
