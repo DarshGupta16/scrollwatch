@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import browser from "webextension-polyfill";
 import { useWatchlist } from "../hooks/useWatchlist";
 import { RuleCard } from "../components/RuleCard";
+import { normalizeDomain } from "../utils/domain";
 
 const App = () => {
   const { watchlist, stats, deleteRule } = useWatchlist(1000); // Faster refresh for popup
@@ -16,8 +17,8 @@ const App = () => {
           currentWindow: true,
         });
         if (tabs[0]?.url) {
-          const url = new URL(tabs[0].url);
-          setCurrentDomain(url.hostname);
+          const domain = normalizeDomain(new URL(tabs[0].url).hostname);
+          setCurrentDomain(domain);
         }
       } catch {
         // Ignore errors

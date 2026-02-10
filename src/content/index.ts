@@ -80,9 +80,11 @@ setInterval(() => {
 
   // If the page is visible (user is looking at it), count it as active time
   if (!document.hidden) {
-    browser.runtime.sendMessage({ type: "ACTIVITY_HEARTBEAT" }).catch(() => {
-      // Ignore errors (e.g. extension context invalidated)
-    });
+    browser.runtime
+      .sendMessage({ type: "ACTIVITY_HEARTBEAT", url: window.location.href })
+      .catch(() => {
+        // Ignore errors (e.g. extension context invalidated)
+      });
   }
 }, 1000);
 

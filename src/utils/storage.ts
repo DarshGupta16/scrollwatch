@@ -1,3 +1,5 @@
+import browser from "webextension-polyfill";
+
 export interface Rule {
   id: string;
   domain: string;
@@ -43,33 +45,11 @@ const devStorage: StorageData = {
   stats: { totalBlocks: 5, startTime: Date.now() - 86400000 * 7 },
 };
 
-// Lazy load browser API only when needed
-let browserApi: typeof import("webextension-polyfill") | null = null;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const chrome: any;
-
-const getBrowser = async () => {
-  if (browserApi) return browserApi;
-
-  try {
-    // Check if we're in extension context first
-    if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-      const module = await import("webextension-polyfill");
-      browserApi = module.default;
-      return browserApi;
-    }
-  } catch {
-    // Not in extension context
-  }
-
-  return null;
-};
+// Check if we're in extension context
+const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
 
 export const getStorage = async (): Promise<StorageData> => {
-  const browser = await getBrowser();
-
-  if (!browser) {
+  if (!isExtension) {
     // Dev mode: use localStorage
     if (typeof localStorage !== "undefined") {
       const stored = localStorage.getItem("scrollwatch-dev");
@@ -78,26 +58,36 @@ export const getStorage = async (): Promise<StorageData> => {
     return devStorage;
   }
 
-  const data = await browser.storage.local.get("scrollwatch");
-  return (
-    data.scrollwatch || {
+  try {
+    const data = await browser.storage.local.get("scrollwatch");
+    return (
+      data.scrollwatch || {
+        watchlist: {},
+        stats: { totalBlocks: 0, startTime: Date.now() },
+      }
+    );
+  } catch (e) {
+    console.error("Error reading storage:", e);
+    return {
       watchlist: {},
       stats: { totalBlocks: 0, startTime: Date.now() },
-    }
-  );
+    };
+  }
 };
 
 export const setStorage = async (data: StorageData): Promise<void> => {
-  const browser = await getBrowser();
-
-  if (!browser) {
+  if (!isExtension) {
     if (typeof localStorage !== "undefined") {
       localStorage.setItem("scrollwatch-dev", JSON.stringify(data));
     }
     return;
   }
 
-  await browser.storage.local.set({ scrollwatch: data });
+  try {
+    await browser.storage.local.set({ scrollwatch: data });
+  } catch (e) {
+    console.error("Error writing storage:", e);
+  }
 };
 
 export const updateRule = async (

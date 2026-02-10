@@ -1,5 +1,6 @@
 import browser, { Runtime } from "webextension-polyfill";
 import { getStorage, setStorage, Rule } from "../utils/storage";
+import { normalizeDomain } from "../utils/domain";
 
 const checkAndResetRules = async () => {
   const data = await getStorage();
@@ -46,11 +47,11 @@ const activeSessions: Record<
 
 browser.runtime.onMessage.addListener(
   (message: unknown, sender: Runtime.MessageSender) => {
-    const msg = message as { type: string };
+    const msg = message as { type: string; url?: string };
     if (msg.type === "ACTIVITY_HEARTBEAT") {
-      handleHeartbeat(sender.tab?.id, sender.tab?.url);
+      return handleHeartbeat(sender.tab?.id, msg.url || sender.tab?.url);
     } else if (msg.type === "CHECK_STATUS") {
-      return checkStatus(sender.tab?.url);
+      return checkStatus(msg.url || sender.tab?.url);
     }
   },
 );
@@ -59,36 +60,43 @@ const handleHeartbeat = async (tabId?: number, url?: string) => {
   if (!tabId || !url) return;
 
   try {
-    const domain = new URL(url).hostname;
+    const domain = normalizeDomain(new URL(url).hostname);
     const now = Date.now();
     const data = await getStorage();
     const rule = data.watchlist[domain];
 
     if (rule && !rule.isBlocked) {
       const session = activeSessions[tabId];
+      let elapsed = 0;
 
       if (session && session.domain === domain) {
         // Calculate elapsed time since last heartbeat (max 5s to prevent jumps)
-        const elapsed = Math.min((now - session.lastHeartbeat) / 1000, 5);
-        rule.consumedTime += elapsed;
+        elapsed = Math.min((now - session.lastHeartbeat) / 1000, 5);
+      } else {
+        // First heartbeat in this session (e.g. after SW restart or tab load)
+        elapsed = 1;
+      }
 
-        if (rule.consumedTime >= rule.allowedDuration) {
-          rule.isBlocked = true;
-          // Constant Interval: Do NOT reset lastReset on block
-          // rule.lastReset = now;
+      rule.consumedTime += elapsed;
 
-          if (!data.stats)
-            data.stats = { totalBlocks: 0, startTime: Date.now() };
-          data.stats.totalBlocks += 1;
+      if (rule.consumedTime >= rule.allowedDuration) {
+        rule.isBlocked = true;
+        // Constant Interval: Do NOT reset lastReset on block
+        // rule.lastReset = now;
 
-          // Notify all tabs
-          const tabs = await browser.tabs.query({});
-          tabs.forEach((tab) => {
-            if (tab.url && new URL(tab.url).hostname === domain) {
-              browser.tabs.sendMessage(tab.id!, { type: "BLOCK_PAGE" });
-            }
-          });
-        }
+        if (!data.stats) data.stats = { totalBlocks: 0, startTime: Date.now() };
+        data.stats.totalBlocks += 1;
+
+        // Notify all tabs
+        const tabs = await browser.tabs.query({});
+        tabs.forEach((tab) => {
+          if (
+            tab.url &&
+            normalizeDomain(new URL(tab.url).hostname) === domain
+          ) {
+            browser.tabs.sendMessage(tab.id!, { type: "BLOCK_PAGE" });
+          }
+        });
       }
 
       activeSessions[tabId] = { domain, lastHeartbeat: now };
@@ -102,7 +110,7 @@ const handleHeartbeat = async (tabId?: number, url?: string) => {
 const checkStatus = async (url?: string) => {
   if (!url) return { isBlocked: false };
   try {
-    const domain = new URL(url).hostname;
+    const domain = normalizeDomain(new URL(url).hostname);
     const data = await getStorage();
     const rule = data.watchlist[domain];
 
@@ -135,7 +143,7 @@ setInterval(() => {
 
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    const domain = new URL(tab.url).hostname;
+    const domain = normalizeDomain(new URL(tab.url).hostname);
     const data = await getStorage();
     if (data.watchlist[domain]?.isBlocked) {
       browser.tabs.sendMessage(tabId, { type: "BLOCK_PAGE" });

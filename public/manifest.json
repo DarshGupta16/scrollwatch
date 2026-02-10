@@ -26,7 +26,10 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "scrollwatch@darshgupta.com"
+      "id": "scrollwatch@darshgupta.com",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   },
   "content_scripts": [

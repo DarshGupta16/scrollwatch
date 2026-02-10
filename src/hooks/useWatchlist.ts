@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getStorage, setStorage, Rule } from "../utils/storage";
 import { toSeconds } from "../utils/time";
+import { normalizeDomain } from "../utils/domain";
 import type { TimeHMS } from "../utils/time";
 
 interface UseWatchlistReturn {
@@ -36,9 +37,7 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
 
   const addRule = useCallback(
     async (domain: string, durationTime: TimeHMS, resetTime: TimeHMS) => {
-      const cleanDomain = domain
-        .replace(/^(https?:\/\/)?(www\.)?/, "")
-        .split("/")[0];
+      const cleanDomain = normalizeDomain(domain);
       const data = await getStorage();
 
       data.watchlist[cleanDomain] = {
