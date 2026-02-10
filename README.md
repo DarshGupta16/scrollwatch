@@ -1,6 +1,3 @@
-⚠️ This entire project was vibecoded using the Gemini CLI with Gemini 3 Pro.
-Why? It was just a one-off micro-project- an extension that I wanted to build and have for myself but didn't have the time for. （￣︶￣）↗　
-
 # ScrollWatch
 
 ScrollWatch is a minimalist, powerful browser extension designed to help you reclaim your time and focus by preventing doomscrolling. Set custom rules for your most distracting websites and let ScrollWatch handle the discipline.
