@@ -9,13 +9,26 @@ const checkAndResetRules = async () => {
 
   for (const domain in data.watchlist) {
     const rule = data.watchlist[domain];
-    // Constant Interval: Reset if time passed, regardless of block status
-    if (now - rule.lastReset >= rule.resetInterval * 1000) {
-      rule.consumedTime = 0;
-      rule.isBlocked = false;
-      // Reset logic: advance lastReset to now (or conceptually start of new interval)
-      rule.lastReset = now;
-      changed = true;
+    const mode = rule.mode || "quota";
+
+    if (mode === "cooldown") {
+      if (rule.isBlocked && rule.blockStartTime) {
+        // Cooldown Mode: Reset only after cooldown duration from block time
+        if (now - rule.blockStartTime >= rule.resetInterval * 1000) {
+          rule.consumedTime = 0;
+          rule.isBlocked = false;
+          rule.blockStartTime = null;
+          changed = true;
+        }
+      }
+    } else {
+      // Quota Mode: Reset if fixed interval passed since last reset
+      if (now - rule.lastReset >= rule.resetInterval * 1000) {
+        rule.consumedTime = 0;
+        rule.isBlocked = false;
+        rule.lastReset = now;
+        changed = true;
+      }
     }
   }
 
@@ -84,6 +97,10 @@ const handleHeartbeat = async (tabId?: number, url?: string) => {
         // Constant Interval: Do NOT reset lastReset on block
         // rule.lastReset = now;
 
+        if (rule.mode === "cooldown") {
+          rule.blockStartTime = now;
+        }
+
         if (!data.stats) data.stats = { totalBlocks: 0, startTime: Date.now() };
         data.stats.totalBlocks += 1;
 
@@ -115,13 +132,26 @@ const checkStatus = async (url?: string) => {
     const rule = data.watchlist[domain];
 
     if (rule) {
-      // Lazy reset: Check if we should reset right now
       const now = Date.now();
-      if (now - rule.lastReset >= rule.resetInterval * 1000) {
-        rule.consumedTime = 0;
-        rule.isBlocked = false;
-        rule.lastReset = now; // Update timestamp
-        await setStorage(data); // Save the unblock immediately
+      const mode = rule.mode || "quota";
+
+      if (mode === "cooldown") {
+        if (rule.isBlocked && rule.blockStartTime) {
+          if (now - rule.blockStartTime >= rule.resetInterval * 1000) {
+            rule.consumedTime = 0;
+            rule.isBlocked = false;
+            rule.blockStartTime = null;
+            await setStorage(data);
+          }
+        }
+      } else {
+        // Quota Mode logic
+        if (now - rule.lastReset >= rule.resetInterval * 1000) {
+          rule.consumedTime = 0;
+          rule.isBlocked = false;
+          rule.lastReset = now; // Update timestamp
+          await setStorage(data); // Save the unblock immediately
+        }
       }
     }
 

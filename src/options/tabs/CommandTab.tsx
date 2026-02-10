@@ -2,6 +2,8 @@ import { TimeInput, TimeValue } from "../../components/TimeInput";
 import { RuleCard } from "../../components/RuleCard";
 import { Rule } from "../../utils/storage";
 
+type ModeType = "quota" | "cooldown";
+
 interface CommandTabProps {
   newDomain: string;
   setNewDomain: (domain: string) => void;
@@ -12,7 +14,35 @@ interface CommandTabProps {
   rules: Rule[];
   onAddRule: (e: React.FormEvent) => void;
   onDeleteRule: (domain: string) => void;
+  onEditRule: (rule: Rule) => void;
+  isEditing: boolean;
+  mode: ModeType;
+  setMode: (mode: ModeType) => void;
 }
+
+const ModeButton = ({
+  label,
+  value,
+  current,
+  onClick,
+}: {
+  label: string;
+  value: ModeType;
+  current: ModeType;
+  onClick: (mode: ModeType) => void;
+}) => (
+  <button
+    type="button"
+    onClick={() => onClick(value)}
+    className={`w-full text-center text-xs uppercase tracking-widest py-3 border transition-colors ${
+      current === value
+        ? "bg-white text-black border-white"
+        : "bg-transparent text-muted border-border hover:bg-surface"
+    }`}
+  >
+    {label}
+  </button>
+);
 
 export const CommandTab = ({
   newDomain,
@@ -24,11 +54,15 @@ export const CommandTab = ({
   rules,
   onAddRule,
   onDeleteRule,
+  onEditRule,
+  isEditing,
+  mode,
+  setMode,
 }: CommandTabProps) => (
   <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
     <section className="lg:col-span-1">
       <h2 className="text-xl font-bold uppercase tracking-widest mb-6 border-l-4 border-accent pl-4">
-        Add Protocol
+        {isEditing ? "Edit Protocol" : "Add Protocol"}
       </h2>
       <form
         onSubmit={onAddRule}
@@ -52,15 +86,38 @@ export const CommandTab = ({
           onChange={setDurationTime}
         />
         <TimeInput
-          label="Reset Interval (H:M:S)"
+          label={
+            mode === "cooldown"
+              ? "Cooldown Duration (H:M:S)"
+              : "Reset Interval (H:M:S)"
+          }
           value={resetTime}
           onChange={setResetTime}
         />
+        <div>
+          <label className="block text-xs font-bold text-muted uppercase tracking-widest mb-2">
+            Mode
+          </label>
+          <div className="flex gap-2">
+            <ModeButton
+              label="Quota"
+              value="quota"
+              current={mode}
+              onClick={setMode}
+            />
+            <ModeButton
+              label="Cooldown"
+              value="cooldown"
+              current={mode}
+              onClick={setMode}
+            />
+          </div>
+        </div>
         <button
           type="submit"
-          className="w-full bg-white text-black font-bold py-4 hover:bg-gray-200 transition-colors uppercase tracking-widest border border-white"
+          className="w-full bg-white text-black font-bold py-4 hover:bg-gray-200 transition-colors uppercase tracking-widest border border-white !mt-8"
         >
-          Initialize Rule
+          {isEditing ? "Update Protocol" : "Initialize Rule"}
         </button>
       </form>
     </section>
@@ -76,7 +133,12 @@ export const CommandTab = ({
           </div>
         ) : (
           rules.map((rule) => (
-            <RuleCard key={rule.domain} rule={rule} onDelete={onDeleteRule} />
+            <RuleCard
+              key={rule.domain}
+              rule={rule}
+              onDelete={onDeleteRule}
+              onEdit={onEditRule}
+            />
           ))
         )}
       </div>

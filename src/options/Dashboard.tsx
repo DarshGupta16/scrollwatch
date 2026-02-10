@@ -5,8 +5,11 @@ import { StatsTab } from "./tabs/StatsTab";
 import { CommandTab } from "./tabs/CommandTab";
 import { LogsTab } from "./tabs/LogsTab";
 import { useWatchlist } from "../hooks/useWatchlist";
+import { toHMS } from "../utils/time";
+import { Rule } from "../utils/storage";
 
 type TabType = "stats" | "command" | "logs";
+type ModeType = "quota" | "cooldown";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<TabType>("stats");
@@ -17,15 +20,36 @@ const Dashboard = () => {
     s: 0,
   });
   const [resetTime, setResetTime] = useState<TimeValue>({ h: 1, m: 0, s: 0 });
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [mode, setMode] = useState<ModeType>("quota");
 
-  const { watchlist, stats, addRule, deleteRule } = useWatchlist();
+  const { watchlist, stats, addRule, updateRule, deleteRule } = useWatchlist();
   const rules = Object.values(watchlist);
 
-  const handleAddRule = async (e: React.FormEvent) => {
+  const handleEditRule = (rule: Rule) => {
+    setNewDomain(rule.domain);
+    setDurationTime(toHMS(rule.allowedDuration));
+    setResetTime(toHMS(rule.resetInterval));
+    setEditingRuleId(rule.domain);
+    setMode(rule.mode || "quota");
+    setActiveTab("command");
+  };
+
+  const handleSubmitRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDomain) return;
-    await addRule(newDomain, durationTime, resetTime);
+
+    if (editingRuleId) {
+      await updateRule(editingRuleId, newDomain, durationTime, resetTime, mode);
+      setEditingRuleId(null);
+    } else {
+      await addRule(newDomain, durationTime, resetTime, mode);
+    }
+
     setNewDomain("");
+    setDurationTime({ h: 0, m: 50, s: 0 });
+    setResetTime({ h: 1, m: 0, s: 0 });
+    setMode("quota");
   };
 
   return (
@@ -78,8 +102,12 @@ const Dashboard = () => {
           resetTime={resetTime}
           setResetTime={setResetTime}
           rules={rules}
-          onAddRule={handleAddRule}
+          onAddRule={handleSubmitRule}
           onDeleteRule={deleteRule}
+          onEditRule={handleEditRule}
+          isEditing={!!editingRuleId}
+          mode={mode}
+          setMode={setMode}
         />
       )}
       {activeTab === "logs" && <LogsTab rules={rules} />}
