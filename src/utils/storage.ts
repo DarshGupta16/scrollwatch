@@ -8,6 +8,8 @@ export interface Rule {
   consumedTime: number; // in seconds
   lastReset: number; // timestamp
   isBlocked: boolean;
+  mode?: "quota" | "cooldown";
+  blockStartTime?: number;
 }
 
 export interface Stats {

@@ -11,12 +11,14 @@ interface UseWatchlistReturn {
     domain: string,
     durationTime: TimeHMS,
     resetTime: TimeHMS,
+    mode: "quota" | "cooldown",
   ) => Promise<void>;
   updateRule: (
     originalDomain: string,
     newDomain: string,
     durationTime: TimeHMS,
     resetTime: TimeHMS,
+    mode: "quota" | "cooldown",
   ) => Promise<void>;
   deleteRule: (domain: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -42,7 +44,12 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
   }, [refresh, refreshInterval]);
 
   const addRule = useCallback(
-    async (domain: string, durationTime: TimeHMS, resetTime: TimeHMS) => {
+    async (
+      domain: string,
+      durationTime: TimeHMS,
+      resetTime: TimeHMS,
+      mode: "quota" | "cooldown",
+    ) => {
       const cleanDomain = normalizeDomain(domain);
       const data = await getStorage();
 
@@ -54,6 +61,8 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
         consumedTime: 0,
         lastReset: Date.now(),
         isBlocked: false,
+        mode,
+        blockStartTime: null,
       };
 
       await setStorage(data);
@@ -68,6 +77,7 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
       newDomain: string,
       durationTime: TimeHMS,
       resetTime: TimeHMS,
+      mode: "quota" | "cooldown",
     ) => {
       const cleanNewDomain = normalizeDomain(newDomain);
       const data = await getStorage();
@@ -75,9 +85,26 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
       if (originalDomain === cleanNewDomain) {
         if (data.watchlist[originalDomain]) {
           const rule = data.watchlist[originalDomain];
+          const oldMode = rule.mode || "quota";
+          
           rule.allowedDuration = toSeconds(durationTime);
           rule.resetInterval = toSeconds(resetTime);
+          rule.mode = mode;
           rule.isBlocked = rule.consumedTime >= rule.allowedDuration;
+
+          // Handle state transitions between modes
+          if (oldMode !== mode) {
+            if (mode === "cooldown") {
+              rule.blockStartTime = rule.isBlocked ? Date.now() : null;
+            } else {
+              // Switching to Quota mode
+              rule.blockStartTime = null;
+              rule.lastReset = Date.now();
+            }
+          } else if (mode === "cooldown" && rule.isBlocked && !rule.blockStartTime) {
+            // Safety: Ensure blocked cooldown rules always have a start time
+            rule.blockStartTime = Date.now();
+          }
         }
       } else {
         if (data.watchlist[originalDomain]) {
@@ -91,6 +118,8 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
           consumedTime: 0,
           lastReset: Date.now(),
           isBlocked: false,
+          mode,
+          blockStartTime: null,
         };
       }
 

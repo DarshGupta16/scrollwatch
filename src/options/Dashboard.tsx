@@ -9,6 +9,7 @@ import { toHMS } from "../utils/time";
 import { Rule } from "../utils/storage";
 
 type TabType = "stats" | "command" | "logs";
+type ModeType = "quota" | "cooldown";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<TabType>("stats");
@@ -20,6 +21,7 @@ const Dashboard = () => {
   });
   const [resetTime, setResetTime] = useState<TimeValue>({ h: 1, m: 0, s: 0 });
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [mode, setMode] = useState<ModeType>("quota");
 
   const { watchlist, stats, addRule, updateRule, deleteRule } = useWatchlist();
   const rules = Object.values(watchlist);
@@ -29,6 +31,7 @@ const Dashboard = () => {
     setDurationTime(toHMS(rule.allowedDuration));
     setResetTime(toHMS(rule.resetInterval));
     setEditingRuleId(rule.domain);
+    setMode(rule.mode || "quota");
     setActiveTab("command");
   };
 
@@ -37,15 +40,16 @@ const Dashboard = () => {
     if (!newDomain) return;
 
     if (editingRuleId) {
-      await updateRule(editingRuleId, newDomain, durationTime, resetTime);
+      await updateRule(editingRuleId, newDomain, durationTime, resetTime, mode);
       setEditingRuleId(null);
     } else {
-      await addRule(newDomain, durationTime, resetTime);
+      await addRule(newDomain, durationTime, resetTime, mode);
     }
 
     setNewDomain("");
     setDurationTime({ h: 0, m: 50, s: 0 });
     setResetTime({ h: 1, m: 0, s: 0 });
+    setMode("quota");
   };
 
   return (
@@ -102,6 +106,8 @@ const Dashboard = () => {
           onDeleteRule={deleteRule}
           onEditRule={handleEditRule}
           isEditing={!!editingRuleId}
+          mode={mode}
+          setMode={setMode}
         />
       )}
       {activeTab === "logs" && <LogsTab rules={rules} />}

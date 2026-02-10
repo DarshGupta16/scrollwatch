@@ -52,7 +52,7 @@ const App = () => {
       {currentDomain && (
         <div className="mb-6">
           {currentRule ? (
-            <RuleCard rule={currentRule} onDelete={deleteRule} />
+            <RuleCard rule={currentRule} showControls={false} />
           ) : (
             <div className="bg-surface border border-border p-4">
               <h3 className="text-lg font-bold tracking-tight truncate mb-2">
