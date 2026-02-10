@@ -12,6 +12,8 @@ interface CommandTabProps {
   rules: Rule[];
   onAddRule: (e: React.FormEvent) => void;
   onDeleteRule: (domain: string) => void;
+  onEditRule: (rule: Rule) => void;
+  isEditing: boolean;
 }
 
 export const CommandTab = ({
@@ -24,11 +26,13 @@ export const CommandTab = ({
   rules,
   onAddRule,
   onDeleteRule,
+  onEditRule,
+  isEditing,
 }: CommandTabProps) => (
   <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
     <section className="lg:col-span-1">
       <h2 className="text-xl font-bold uppercase tracking-widest mb-6 border-l-4 border-accent pl-4">
-        Add Protocol
+        {isEditing ? "Edit Protocol" : "Add Protocol"}
       </h2>
       <form
         onSubmit={onAddRule}
@@ -60,7 +64,7 @@ export const CommandTab = ({
           type="submit"
           className="w-full bg-white text-black font-bold py-4 hover:bg-gray-200 transition-colors uppercase tracking-widest border border-white"
         >
-          Initialize Rule
+          {isEditing ? "Update Protocol" : "Initialize Rule"}
         </button>
       </form>
     </section>
@@ -76,7 +80,12 @@ export const CommandTab = ({
           </div>
         ) : (
           rules.map((rule) => (
-            <RuleCard key={rule.domain} rule={rule} onDelete={onDeleteRule} />
+            <RuleCard
+              key={rule.domain}
+              rule={rule}
+              onDelete={onDeleteRule}
+              onEdit={onEditRule}
+            />
           ))
         )}
       </div>

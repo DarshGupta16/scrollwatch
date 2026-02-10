@@ -12,6 +12,12 @@ interface UseWatchlistReturn {
     durationTime: TimeHMS,
     resetTime: TimeHMS,
   ) => Promise<void>;
+  updateRule: (
+    originalDomain: string,
+    newDomain: string,
+    durationTime: TimeHMS,
+    resetTime: TimeHMS,
+  ) => Promise<void>;
   deleteRule: (domain: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -56,6 +62,44 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
     [refresh],
   );
 
+  const updateRule = useCallback(
+    async (
+      originalDomain: string,
+      newDomain: string,
+      durationTime: TimeHMS,
+      resetTime: TimeHMS,
+    ) => {
+      const cleanNewDomain = normalizeDomain(newDomain);
+      const data = await getStorage();
+
+      if (originalDomain === cleanNewDomain) {
+        if (data.watchlist[originalDomain]) {
+          const rule = data.watchlist[originalDomain];
+          rule.allowedDuration = toSeconds(durationTime);
+          rule.resetInterval = toSeconds(resetTime);
+          rule.isBlocked = rule.consumedTime >= rule.allowedDuration;
+        }
+      } else {
+        if (data.watchlist[originalDomain]) {
+          delete data.watchlist[originalDomain];
+        }
+        data.watchlist[cleanNewDomain] = {
+          id: Math.random().toString(36).substr(2, 9),
+          domain: cleanNewDomain,
+          allowedDuration: toSeconds(durationTime),
+          resetInterval: toSeconds(resetTime),
+          consumedTime: 0,
+          lastReset: Date.now(),
+          isBlocked: false,
+        };
+      }
+
+      await setStorage(data);
+      await refresh();
+    },
+    [refresh],
+  );
+
   const deleteRule = useCallback(
     async (domain: string) => {
       const data = await getStorage();
@@ -66,5 +110,5 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
     [refresh],
   );
 
-  return { watchlist, stats, addRule, deleteRule, refresh };
+  return { watchlist, stats, addRule, updateRule, deleteRule, refresh };
 };

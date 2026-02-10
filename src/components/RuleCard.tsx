@@ -5,12 +5,13 @@ import { formatTime } from "../utils/time";
 interface RuleCardProps {
   rule: Rule;
   onDelete: (domain: string) => void;
+  onEdit: (rule: Rule) => void;
 }
 
 /**
  * Card displaying a single rule with progress bar
  */
-export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
+export const RuleCard = ({ rule, onDelete, onEdit }: RuleCardProps) => {
   const [timeUntilReset, setTimeUntilReset] = useState(0);
 
   useEffect(() => {
@@ -45,12 +46,20 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
             </span>
           </div>
         </div>
-        <button
-          onClick={() => onDelete(rule.domain)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted hover:text-red-500 uppercase text-xs font-bold tracking-widest"
-        >
-          [TERMINATE]
-        </button>
+        <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => onEdit(rule)}
+            className="text-muted hover:text-accent uppercase text-xs font-bold tracking-widest"
+          >
+            [EDIT]
+          </button>
+          <button
+            onClick={() => onDelete(rule.domain)}
+            className="text-muted hover:text-red-500 uppercase text-xs font-bold tracking-widest"
+          >
+            [TERMINATE]
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
