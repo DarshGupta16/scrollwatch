@@ -6,21 +6,28 @@ export class BatchStorageManager {
   private isDirty: boolean = false;
   private flushIntervalMs: number = 10000;
   private flushTimer: NodeJS.Timeout | null = null;
+  private initPromise: Promise<void> | null = null;
 
   constructor(flushIntervalMs = 10000) {
     this.flushIntervalMs = flushIntervalMs;
   }
 
   async init() {
-    this.data = await getStorage();
-    this.startFlushLoop();
-    
-    // Listen for external updates (e.g. Options page adding rules)
-    browser.storage.onChanged.addListener((changes, area) => {
-      if (area === "local" && changes.scrollwatch) {
-        this.syncFromStorage(changes.scrollwatch.newValue as StorageData);
-      }
-    });
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = (async () => {
+      this.data = await getStorage();
+      this.startFlushLoop();
+
+      // Listen for external updates (e.g. Options page adding rules)
+      browser.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && changes.scrollwatch) {
+          this.syncFromStorage(changes.scrollwatch.newValue as StorageData);
+        }
+      });
+    })();
+
+    return this.initPromise;
   }
 
   /**
@@ -50,18 +57,19 @@ export class BatchStorageManager {
         currentWatchlist[domain] = incoming;
       } else {
         // Existing rule: Update config, PRESERVE tracking state
-        // If the UI overwrites consumedTime with 0 (stale), we ignore it.
-        // We only accept config changes.
         current.allowedDuration = incoming.allowedDuration;
         current.resetInterval = incoming.resetInterval;
-        
-        // Note: If the user manually resets a rule in UI, we might miss it here?
-        // But currently UI only deletes. 
+        // Also sync isBlocked if it changed in storage (e.g. manual unblock/block)
+        current.isBlocked = incoming.isBlocked;
       }
     }
 
     this.data.watchlist = currentWatchlist;
-    // We don't sync stats usually, assuming Background is the writer.
+    
+    // Sync stats if they are newer (simple heuristic: higher totalBlocks)
+    if (newData.stats && (!this.data.stats || newData.stats.totalBlocks > this.data.stats.totalBlocks)) {
+      this.data.stats = newData.stats;
+    }
   }
 
   getRule(domain: string): Rule | undefined {
@@ -72,17 +80,19 @@ export class BatchStorageManager {
     return this.data?.stats;
   }
 
-  async incrementTime(domain: string, seconds: number): Promise<{ isBlocked: boolean; justBlocked: boolean }> {
-    if (!this.data) await this.init();
+  async incrementTime(
+    domain: string,
+    seconds: number,
+  ): Promise<{ isBlocked: boolean; justBlocked: boolean }> {
+    await this.init();
     if (!this.data) return { isBlocked: false, justBlocked: false };
 
     const rule = this.data.watchlist[domain];
     if (!rule) return { isBlocked: false, justBlocked: false };
 
-    // Check for reset first (logic moved from checkAndResetRules to here for consistency)
+    // Check for reset first
     const now = Date.now();
     if (now - rule.lastReset >= rule.resetInterval * 1000) {
-      console.log(`[Manager] Resetting rule for ${domain}. Elapsed since reset: ${(now - rule.lastReset)/1000}s`);
       rule.consumedTime = 0;
       rule.isBlocked = false;
       rule.lastReset = now;
@@ -100,9 +110,9 @@ export class BatchStorageManager {
         this.data.stats = { totalBlocks: 0, startTime: Date.now() };
       }
       this.data.stats.totalBlocks += 1;
-      
+
       // Flush IMMEDIATELY on block to ensure other tabs/popup see it ASAP
-      await this.flush(); 
+      await this.flush();
       return { isBlocked: true, justBlocked: true };
     }
 
@@ -110,28 +120,25 @@ export class BatchStorageManager {
   }
 
   async checkStatus(domain: string): Promise<boolean> {
-    if (!this.data) await this.init();
-    
+    await this.init();
+
     const rule = this.data?.watchlist[domain];
     if (!rule) return false;
 
     // Lazy reset check
     const now = Date.now();
     if (now - rule.lastReset >= rule.resetInterval * 1000) {
-      console.log(`[Manager] checkStatus Resetting rule for ${domain}`);
       rule.consumedTime = 0;
       rule.isBlocked = false;
       rule.lastReset = now;
       this.isDirty = true;
-      // We modified state, but maybe don't need to flush immediately unless we want to persist the reset timestamp
-      // For safety, let's mark dirty and let the loop handle it
     }
 
     return rule.isBlocked;
   }
 
   async checkAllRules() {
-    if (!this.data) await this.init();
+    await this.init();
     if (!this.data) return;
 
     const now = Date.now();
@@ -155,7 +162,7 @@ export class BatchStorageManager {
 
   async flush() {
     if (!this.data || !this.isDirty) return;
-    
+
     try {
       await setStorage(this.data);
       this.isDirty = false;
@@ -174,4 +181,10 @@ export class BatchStorageManager {
   async forceSave() {
     await this.flush();
   }
+
+  public async getData(): Promise<StorageData | null> {
+    await this.init();
+    return this.data;
+  }
 }
+

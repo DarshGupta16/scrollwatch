@@ -50,7 +50,7 @@ describe('BatchStorageManager', () => {
   it('should update consumed time in memory without writing to storage immediately', async () => {
     await manager.init();
     
-    manager.incrementTime('example.com', 5);
+    await manager.incrementTime('example.com', 5);
     
     expect(manager.getRule('example.com')?.consumedTime).toBe(55);
     expect(mockSet).not.toHaveBeenCalled(); // Should not write yet
@@ -59,7 +59,7 @@ describe('BatchStorageManager', () => {
   it('should flush to storage after the flush interval', async () => {
     await manager.init();
     
-    manager.incrementTime('example.com', 5);
+    await manager.incrementTime('example.com', 5);
     
     // Fast forward 10 seconds (default flush interval)
     vi.advanceTimersByTime(10000);
@@ -118,5 +118,13 @@ describe('BatchStorageManager', () => {
     expect(manager.getRule('example.com')?.isBlocked).toBe(false);
     expect(manager.getRule('example.com')?.consumedTime).toBe(1);
     expect(mockSet).toHaveBeenCalled(); // Should save the reset state
+  });
+
+  it('should return the current state via getData()', async () => {
+    await manager.init();
+    await manager.incrementTime('example.com', 10);
+    
+    const data = await manager.getData();
+    expect(data?.watchlist['example.com'].consumedTime).toBe(60); // 50 (init) + 10
   });
 });

@@ -24,6 +24,19 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
   const [stats, setStats] = useState({ totalBlocks: 0, startTime: Date.now() });
 
   const refresh = useCallback(async () => {
+    try {
+      // Try to get real-time data from background first
+      const liveData = await browser.runtime.sendMessage({ type: "GET_STATE" });
+      if (liveData && liveData.watchlist) {
+        setWatchlist(liveData.watchlist);
+        setStats(liveData.stats || { totalBlocks: 0, startTime: Date.now() });
+        return;
+      }
+    } catch (e) {
+      // Background might be sleeping or unreachable, fall back to storage
+      // console.debug("Failed to get live state, falling back to storage", e);
+    }
+
     const data = await getStorage();
     setWatchlist(data.watchlist);
     setStats(data.stats || { totalBlocks: 0, startTime: Date.now() });

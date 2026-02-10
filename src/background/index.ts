@@ -40,6 +40,8 @@ browser.runtime.onMessage.addListener(
       return handleHeartbeat(sender.tab?.id, msg.url || sender.tab?.url);
     } else if (msg.type === "CHECK_STATUS") {
       return checkStatus(msg.url || sender.tab?.url);
+    } else if (msg.type === "GET_STATE") {
+      return manager.getData();
     }
   },
 );
