@@ -62,29 +62,28 @@ browser.runtime.onMessage.addListener((message) => {
 });
 
 // Check for activity every second
-setInterval(() => {
-  if (isBlocked) {
-    // Poll for unblock
-    browser.runtime
-      .sendMessage({ type: "CHECK_STATUS" })
-      .then((response) => {
-        if (!response?.isBlocked) {
-          window.location.reload();
-        }
-      })
-      .catch(() => {
-        // Ignore errors
-      });
-    return;
-  }
+const heartbeatInterval = setInterval(async () => {
+  try {
+    if (isBlocked) {
+      // Poll for unblock
+      const response = await browser.runtime.sendMessage({ type: "CHECK_STATUS" });
+      if (!response?.isBlocked) {
+        window.location.reload();
+      }
+      return;
+    }
 
-  // If the page is visible (user is looking at it), count it as active time
-  console.log("Checking activity... Hidden:", document.hidden);
-  if (!document.hidden) {
-    browser.runtime
-      .sendMessage({ type: "ACTIVITY_HEARTBEAT", url: window.location.href })
-      .then(() => console.log("Heartbeat sent"))
-      .catch((e) => console.error("Heartbeat failed", e));
+    // If the page is visible (user is looking at it), count it as active time
+    if (!document.hidden) {
+      await browser.runtime.sendMessage({ type: "ACTIVITY_HEARTBEAT", url: window.location.href });
+    }
+  } catch (e: any) {
+    if (e.message?.includes("Extension context invalidated")) {
+      console.log("[ScrollWatch] Protocol link severed (Extension updated). Stopping heartbeat.");
+      clearInterval(heartbeatInterval);
+    } else {
+      // Ignore other errors (e.g. transient connection issues)
+    }
   }
 }, 1000);
 
@@ -94,4 +93,4 @@ browser.runtime.sendMessage({ type: "CHECK_STATUS" }).then((response) => {
     isBlocked = true;
     showBlockOverlay();
   }
-});
+}).catch(() => {});

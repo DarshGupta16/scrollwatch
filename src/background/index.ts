@@ -2,8 +2,8 @@ import browser, { Runtime } from "webextension-polyfill";
 import { BatchStorageManager } from "./BatchStorageManager";
 import { normalizeDomain } from "../utils/domain";
 
-// Initialize Manager (10 second flush interval)
-const manager = new BatchStorageManager(10000);
+// Initialize Manager (5 second flush interval)
+const manager = new BatchStorageManager(5000);
 
 // Initialize on extension start
 manager.init();
@@ -28,10 +28,53 @@ browser.alarms.onAlarm.addListener((alarm) => {
 });
 
 // Keep track of active sessions for elapsed time calculation
+// We use a local cache for speed, but ideally sync to storage.session
 const activeSessions: Record<
   number,
   { domain: string; lastHeartbeat: number }
 > = {};
+
+// Helper to get/set session state reliably across SW restarts
+const getSession = async (tabId: number) => {
+  if (activeSessions[tabId]) return activeSessions[tabId];
+  
+  try {
+    if (browser.storage && (browser.storage as any).session) {
+      const res = await (browser.storage as any).session.get(`session_${tabId}`);
+      if (res[`session_${tabId}`]) {
+        activeSessions[tabId] = res[`session_${tabId}`];
+        return activeSessions[tabId];
+      }
+    }
+  } catch (e) {
+    // Session storage not available or failed
+  }
+  return null;
+};
+
+const setSession = async (tabId: number, domain: string, lastHeartbeat: number) => {
+  const session = { domain, lastHeartbeat };
+  activeSessions[tabId] = session;
+  
+  try {
+    if (browser.storage && (browser.storage as any).session) {
+      await (browser.storage as any).session.set({ [`session_${tabId}`]: session });
+    }
+  } catch (e) {
+    // Session storage not available or failed
+  }
+};
+
+const removeSession = async (tabId: number) => {
+  delete activeSessions[tabId];
+  try {
+    if (browser.storage && (browser.storage as any).session) {
+      await (browser.storage as any).session.remove(`session_${tabId}`);
+    }
+  } catch (e) {
+    // Session storage not available or failed
+  }
+};
 
 browser.runtime.onMessage.addListener(
   (message: unknown, sender: Runtime.MessageSender) => {
@@ -43,6 +86,7 @@ browser.runtime.onMessage.addListener(
     } else if (msg.type === "GET_STATE") {
       return manager.getData();
     }
+    return undefined;
   },
 );
 
@@ -53,26 +97,21 @@ const handleHeartbeat = async (tabId?: number, url?: string) => {
     const domain = normalizeDomain(new URL(url).hostname);
     const now = Date.now();
     
-    const session = activeSessions[tabId];
+    const session = await getSession(tabId);
     let elapsed = 0;
 
     if (session && session.domain === domain) {
       // Calculate elapsed time since last heartbeat
       const diff = (now - session.lastHeartbeat) / 1000;
       
-      // If gap is too large (e.g. > 2s), assume user was away/inactive/reloaded.
-      // Don't penalize for time spent inactive. Treat as resume (0s).
-      // We start counting from the NEXT heartbeat.
-      if (diff > 2.0) {
-        console.log(`[Heartbeat] Tab ${tabId} ${domain} - Large Gap (${diff.toFixed(2)}s) - Resetting elapsed to 0s`);
+      // Trust up to 5 seconds. If longer, assume user was away or tab was sleeping.
+      if (diff > 5.0) {
         elapsed = 0;
       } else {
         elapsed = diff;
       }
-      // console.log(`[Heartbeat] Tab ${tabId} ${domain} - Diff: ${diff.toFixed(2)}s - Elapsed: ${elapsed.toFixed(2)}s`);
     } else {
       // First heartbeat in this session
-      console.log(`[Heartbeat] Tab ${tabId} ${domain} - First heartbeat (New Session)`);
       elapsed = 0;
     }
 
@@ -81,26 +120,24 @@ const handleHeartbeat = async (tabId?: number, url?: string) => {
 
     if (result.justBlocked) {
       // Notify this tab specifically
-      browser.tabs.sendMessage(tabId, { type: "BLOCK_PAGE" });
+      browser.tabs.sendMessage(tabId, { type: "BLOCK_PAGE" }).catch(() => {});
       
       // Also notify other tabs for this domain to keep them in sync
        const tabs = await browser.tabs.query({});
         tabs.forEach((tab) => {
           if (
-            tab.id !== tabId && // Skip current tab as we just messaged it
+            tab.id !== tabId && 
             tab.url &&
             normalizeDomain(new URL(tab.url).hostname) === domain
           ) {
-            browser.tabs.sendMessage(tab.id!, { type: "BLOCK_PAGE" });
+            browser.tabs.sendMessage(tab.id!, { type: "BLOCK_PAGE" }).catch(() => {});
           }
         });
     } else if (result.isBlocked) {
-       // Should be blocked but wasn't *just* blocked. 
-       // Ensure tab is blocked (idempotent)
-       browser.tabs.sendMessage(tabId, { type: "BLOCK_PAGE" });
+       browser.tabs.sendMessage(tabId, { type: "BLOCK_PAGE" }).catch(() => {});
     }
 
-    activeSessions[tabId] = { domain, lastHeartbeat: now };
+    await setSession(tabId, domain, now);
   } catch (e) {
     console.error("Heartbeat error:", e);
   }
@@ -118,20 +155,19 @@ const checkStatus = async (url?: string) => {
 };
 
 // Cleanup inactive sessions
-setInterval(() => {
+setInterval(async () => {
   const now = Date.now();
   for (const tabId in activeSessions) {
-    if (now - activeSessions[tabId].lastHeartbeat > 10000) {
-      delete activeSessions[tabId];
+    if (now - activeSessions[parseInt(tabId)].lastHeartbeat > 30000) {
+      await removeSession(parseInt(tabId));
     }
   }
-}, 10000);
+}, 30000);
 
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   // Reset session tracking on navigation/reload
   if (changeInfo.status === "loading") {
-    console.log(`[Background] Tab ${tabId} loading - Clearing session.`);
-    delete activeSessions[tabId];
+    await removeSession(tabId);
   }
 
   if (changeInfo.status === "complete" && tab.url) {

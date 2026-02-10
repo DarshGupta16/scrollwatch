@@ -22,7 +22,7 @@ The project is configured in `vite.config.ts` with three distinct entry points:
 
 2. **Background Script (`src/background/index.ts`)**
    - A Service Worker that manages the logic for tracking "scrolling time".
-   - **Optimization:** Uses `BatchStorageManager` to cache tracking data in memory and flush to `storage.local` every 10 seconds (or immediately on block) to avoid browser write quota limits.
+   - **Optimization:** Uses `BatchStorageManager` to cache tracking data in memory and flush to `storage.local` every 10 seconds (or immediately on block). It employs a promise-based initialization lock to prevent race conditions during concurrent storage access.
    - **Debounce:** Ignores the first heartbeat of a new session (elapsed=0s) to prevent "redirect penalties" on SPAs like x.com.
 
 3. **Content Script (`src/content/index.ts`)**
@@ -35,7 +35,7 @@ The project is configured in `vite.config.ts` with three distinct entry points:
 ## State Management & Storage
 - **Storage:** Uses `browser.storage.local` via the polyfill.
 - **Utility:** `src/utils/storage.ts` provides typed wrappers (`getStorage`, `setStorage`) for the rules.
-- **Syncing:** The Background script listens for `storage.onChanged` to sync rule updates from the Options UI without overwriting in-memory tracking state.
+- **Syncing:** The Background script listens for `storage.onChanged` to merge rule updates from the Options UI into the live state. It also provides a `GET_STATE` bridge for the Popup UI to ensure real-time consumption bars without waiting for storage flushes.
 
 **Schema:**
 ```typescript

@@ -4,11 +4,12 @@ import { getStorage, setStorage, StorageData, Rule } from "../utils/storage";
 export class BatchStorageManager {
   private data: StorageData | null = null;
   private isDirty: boolean = false;
-  private flushIntervalMs: number = 10000;
+  private dirtyCount: number = 0;
+  private flushIntervalMs: number = 5000;
   private flushTimer: NodeJS.Timeout | null = null;
   private initPromise: Promise<void> | null = null;
 
-  constructor(flushIntervalMs = 10000) {
+  constructor(flushIntervalMs = 5000) {
     this.flushIntervalMs = flushIntervalMs;
   }
 
@@ -103,6 +104,12 @@ export class BatchStorageManager {
 
     rule.consumedTime += seconds;
     this.isDirty = true;
+    this.dirtyCount++;
+
+    // Proactive flush if many changes accumulated (e.g. 5 heartbeats)
+    if (this.dirtyCount >= 5) {
+      this.flush();
+    }
 
     if (rule.consumedTime >= rule.allowedDuration) {
       rule.isBlocked = true;
@@ -166,6 +173,7 @@ export class BatchStorageManager {
     try {
       await setStorage(this.data);
       this.isDirty = false;
+      this.dirtyCount = 0;
     } catch (e) {
       console.error("Failed to flush storage:", e);
     }
