@@ -79,12 +79,12 @@ setInterval(() => {
   }
 
   // If the page is visible (user is looking at it), count it as active time
+  console.log("Checking activity... Hidden:", document.hidden);
   if (!document.hidden) {
     browser.runtime
       .sendMessage({ type: "ACTIVITY_HEARTBEAT", url: window.location.href })
-      .catch(() => {
-        // Ignore errors (e.g. extension context invalidated)
-      });
+      .then(() => console.log("Heartbeat sent"))
+      .catch((e) => console.error("Heartbeat failed", e));
   }
 }, 1000);
 
