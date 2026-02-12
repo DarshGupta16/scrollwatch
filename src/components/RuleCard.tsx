@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
+import browser from "webextension-polyfill";
 import { Rule } from "../utils/storage";
 import { formatTime } from "../utils/time";
+
+// Helper to check if we are in an extension context
+const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
 
 interface RuleCardProps {
   rule: Rule;
@@ -42,6 +46,8 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
 
   // Optimistic Increment: Listen for heartbeats to tick up locally
   useEffect(() => {
+    if (!isExtension) return;
+
     const messageListener = (message: any) => {
       if (message.type === "ACTIVITY_HEARTBEAT") {
         try {
