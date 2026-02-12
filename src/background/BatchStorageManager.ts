@@ -72,8 +72,9 @@ export class BatchStorageManager {
         current.allowedDuration = incoming.allowedDuration;
         current.resetInterval = incoming.resetInterval;
         
-        // If storage has a reset (consumedTime=0) that we don't have, accept it
-        if (incoming.consumedTime === 0 && current.consumedTime > 0) {
+        // If storage has a reset (consumedTime=0) OR isBlocked is now false when it was true
+        // (means manual unblock/reset from UI), we MUST accept it.
+        if ((incoming.consumedTime === 0 && current.consumedTime > 0) || (current.isBlocked && !incoming.isBlocked)) {
            current.consumedTime = 0;
            current.lastReset = incoming.lastReset;
            current.isBlocked = false;
@@ -135,16 +136,26 @@ export class BatchStorageManager {
 
     // Check for reset first
     const now = Date.now();
+    let wasReset = false;
     if (now - rule.lastReset >= rule.resetInterval * 1000) {
       rule.consumedTime = 0;
       rule.isBlocked = false;
       rule.lastReset = now;
       this.isDirty = true;
+      wasReset = true;
     }
 
     if (rule.isBlocked) return { isBlocked: true, justBlocked: false, rule };
 
+    // Global Pulse Logic: 
+    // If multiple tabs are open, we only count the time once per second for that domain.
+    // We bypass this check if the rule was JUST reset so we don't drop the first second.
+    if (!wasReset && rule.lastProcessed && now - rule.lastProcessed < 800) {
+      return { isBlocked: false, justBlocked: false, rule };
+    }
+
     rule.consumedTime += seconds;
+    rule.lastProcessed = now;
     this.isDirty = true;
     this.dirtyCount++;
     this.updateCache();

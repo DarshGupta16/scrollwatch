@@ -12,6 +12,20 @@ interface RuleCardProps {
  */
 export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
   const [timeUntilReset, setTimeUntilReset] = useState(0);
+  const [visualConsumed, setVisualConsumed] = useState(rule.consumedTime);
+
+  // Sync visual time with official time ONLY on initialization or reset
+  useEffect(() => {
+    setVisualConsumed((prev) => {
+      // If the official time jumped significantly (more than 2s difference)
+      // or if it's a reset (new official < current visual), we sync.
+      // Otherwise, we let the local optimistic timer lead for smoothness.
+      if (Math.abs(rule.consumedTime - prev) > 2 || rule.consumedTime < prev || rule.isBlocked) {
+        return rule.consumedTime;
+      }
+      return prev;
+    });
+  }, [rule.consumedTime, rule.isBlocked]);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -26,9 +40,26 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
     return () => clearInterval(interval);
   }, [rule.lastReset, rule.resetInterval]);
 
+  // Optimistic Increment: Listen for heartbeats to tick up locally
+  useEffect(() => {
+    const messageListener = (message: any) => {
+      if (message.type === "ACTIVITY_HEARTBEAT") {
+        try {
+          const domain = new URL(message.url).hostname.replace("www.", "");
+          if (domain === rule.domain && !rule.isBlocked) {
+            setVisualConsumed(prev => Math.min(rule.allowedDuration, prev + 1));
+          }
+        } catch (e) {}
+      }
+    };
+
+    browser.runtime.onMessage.addListener(messageListener);
+    return () => browser.runtime.onMessage.removeListener(messageListener);
+  }, [rule.domain, rule.isBlocked, rule.allowedDuration]);
+
   const consumptionProgress = Math.min(
     100,
-    (rule.consumedTime / rule.allowedDuration) * 100,
+    (visualConsumed / rule.allowedDuration) * 100,
   );
 
   return (
@@ -59,7 +90,7 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
           <div className="flex justify-between text-xs font-mono text-muted uppercase">
             <span>Consumption</span>
             <span>
-              {formatTime(rule.consumedTime)} /{" "}
+              {formatTime(visualConsumed)} /{" "}
               {formatTime(rule.allowedDuration)}
             </span>
           </div>

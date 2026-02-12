@@ -7,6 +7,7 @@ export interface Rule {
   resetInterval: number; // in seconds
   consumedTime: number; // in seconds
   lastReset: number; // timestamp
+  lastProcessed?: number; // timestamp of last heartbeat processed
   isBlocked: boolean;
 }
 
