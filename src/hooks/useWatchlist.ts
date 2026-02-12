@@ -45,7 +45,44 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
       data = await getStorage();
     }
     
-    setWatchlist(data.watchlist || {});
+    const newWatchlist = data.watchlist || {};
+    
+    // Apply monotonicity to the polled data
+    setWatchlist(prev => {
+      const merged = { ...prev };
+      let changed = false;
+
+      for (const domain in newWatchlist) {
+        const incoming = newWatchlist[domain];
+        const current = prev[domain];
+
+        if (!current) {
+          merged[domain] = incoming;
+          changed = true;
+          continue;
+        }
+
+        const isNewReset = incoming.lastReset > current.lastReset;
+        const isTimeIncrease = incoming.consumedTime > current.consumedTime;
+        const configChanged = incoming.allowedDuration !== current.allowedDuration;
+
+        if (isNewReset || isTimeIncrease || configChanged) {
+          merged[domain] = incoming;
+          changed = true;
+        }
+      }
+      
+      // Also handle removals
+      for (const domain in prev) {
+        if (!newWatchlist[domain]) {
+          delete merged[domain];
+          changed = true;
+        }
+      }
+
+      return changed ? merged : prev;
+    });
+
     setStats(data.stats || { totalBlocks: 0, startTime: Date.now() });
   }, []);
 
@@ -57,10 +94,25 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
     if (isExtension) {
       messageListener = (message: any) => {
         if (message.type === "STATE_UPDATED") {
-          setWatchlist(prev => ({
-            ...prev,
-            [message.domain]: message.rule
-          }));
+          setWatchlist(prev => {
+            const currentRule = prev[message.domain];
+            const newRule = message.rule;
+
+            if (currentRule) {
+              const isNewReset = newRule.lastReset > currentRule.lastReset;
+              const isTimeIncrease = newRule.consumedTime > currentRule.consumedTime;
+              const configChanged = newRule.allowedDuration !== currentRule.allowedDuration;
+
+              if (!isNewReset && !isTimeIncrease && !configChanged) {
+                return prev;
+              }
+            }
+
+            return {
+              ...prev,
+              [message.domain]: newRule
+            };
+          });
           if (message.stats) {
             setStats(message.stats);
           }

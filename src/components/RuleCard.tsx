@@ -65,7 +65,7 @@ export const RuleCard = ({ rule, onDelete }: RuleCardProps) => {
           </div>
           <div className="h-2 bg-bg border border-border w-full">
             <div
-              className={`h-full transition-all duration-300 ${rule.isBlocked ? "bg-red-500" : "bg-white"}`}
+              className={`h-full transition-[width] duration-1000 ease-linear ${rule.isBlocked ? "bg-red-500" : "bg-white"}`}
               style={{ width: `${consumptionProgress}%` }}
             />
           </div>
