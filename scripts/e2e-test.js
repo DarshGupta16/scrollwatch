@@ -41,30 +41,68 @@ const LOCAL_TEST_URL = `http://localhost:${PORT}`;
 
   try {
     // Wait for extension to load
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 2000));
     
     // Find Extension ID
     let extensionId = '';
-    const workerTarget = await browser.waitForTarget(
-        t => t.type() === 'service_worker' && t.url().startsWith('chrome-extension://')
-    );
-    extensionId = workerTarget.url().split('/')[2];
-    console.log(`Extension ID: ${extensionId}`);
-
-    // Attach Logger to Service Worker
-    const worker = await workerTarget.worker();
-    if (worker) {
-      worker.on('console', msg => console.log(`[SERVICE WORKER] ${msg.text()}`));
-    } else {
-      console.warn('Could not attach to service worker console.');
+    console.log('Searching for extension target...');
+    
+    // Try to find any target that belongs to our extension
+    const targets = await browser.targets();
+    for (const target of targets) {
+      const url = target.url();
+      if (url.startsWith('chrome-extension://')) {
+        extensionId = url.split('/')[2];
+        console.log(`Found extension ID from target ${url}: ${extensionId}`);
+        break;
+      }
     }
 
-    // Open Options Page once
+    if (!extensionId) {
+      console.log('Target not found, checking chrome://extensions...');
+      const extPage = await browser.newPage();
+      await extPage.goto('chrome://extensions', { waitUntil: 'networkidle2' });
+      extensionId = await extPage.evaluate(() => {
+        try {
+          const manager = document.querySelector('extensions-manager');
+          const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+          const items = itemList.shadowRoot.querySelectorAll('extensions-item');
+          for (const item of items) {
+             const name = item.shadowRoot.querySelector('#name').textContent;
+             if (name.toLowerCase().includes('scrollwatch')) {
+               return item.id;
+             }
+          }
+        } catch (e) {
+          return '';
+        }
+        return '';
+      });
+      await extPage.close();
+    }
+
+    if (!extensionId) {
+       // Last resort: query all targets again after a longer wait
+       await new Promise(r => setTimeout(r, 3000));
+       const finalTargets = await browser.targets();
+       for (const target of finalTargets) {
+         if (target.url().startsWith('chrome-extension://')) {
+           extensionId = target.url().split('/')[2];
+           break;
+         }
+       }
+    }
+
+    if (!extensionId) throw new Error('Could not find Extension ID');
+    console.log(`Final Extension ID: ${extensionId}`);
+
+    // Open Options Page
     const optionsPage = await browser.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
     
     // Navigate to Command Center
     console.log('Switching to Commands tab...');
+    await optionsPage.waitForSelector('button');
     const tabs = await optionsPage.$$('button');
     let commandTabFound = false;
     for (const tab of tabs) {
@@ -72,6 +110,8 @@ const LOCAL_TEST_URL = `http://localhost:${PORT}`;
       if (text && (text.includes('Command Center') || text.includes('COMMAND CENTER'))) {
         await tab.click();
         commandTabFound = true;
+        // Wait for the form to appear to confirm switch
+        await optionsPage.waitForSelector('input[placeholder="twitter.com"]', { visible: true });
         break;
       }
     }

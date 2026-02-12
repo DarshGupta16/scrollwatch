@@ -126,7 +126,7 @@ export class BatchStorageManager {
   async incrementTime(
     domain: string,
     seconds: number,
-  ): Promise<{ isBlocked: boolean; justBlocked: boolean }> {
+  ): Promise<{ isBlocked: boolean; justBlocked: boolean; rule?: Rule }> {
     await this.init();
     if (!this.data) return { isBlocked: false, justBlocked: false };
 
@@ -142,7 +142,7 @@ export class BatchStorageManager {
       this.isDirty = true;
     }
 
-    if (rule.isBlocked) return { isBlocked: true, justBlocked: false };
+    if (rule.isBlocked) return { isBlocked: true, justBlocked: false, rule };
 
     rule.consumedTime += seconds;
     this.isDirty = true;
@@ -162,10 +162,10 @@ export class BatchStorageManager {
       this.data.stats.totalBlocks += 1;
 
       await this.flush();
-      return { isBlocked: true, justBlocked: true };
+      return { isBlocked: true, justBlocked: true, rule };
     }
 
-    return { isBlocked: false, justBlocked: false };
+    return { isBlocked: false, justBlocked: false, rule };
   }
 
   async checkStatus(domain: string): Promise<boolean> {

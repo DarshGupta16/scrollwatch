@@ -122,6 +122,16 @@ const handleHeartbeat = async (tabId?: number, url?: string) => {
     // Update via Manager
     const result = await manager.incrementTime(domain, elapsed);
 
+    // Broadcast the update to any open UI (Popup/Options)
+    if (result.rule) {
+      browser.runtime.sendMessage({
+        type: "STATE_UPDATED",
+        domain,
+        rule: result.rule,
+        stats: manager.getStats()
+      }).catch(() => {}); // Ignore errors if no UI is open
+    }
+
     if (result.justBlocked) {
       // Notify this tab specifically
       browser.tabs.sendMessage(tabId, { type: "BLOCK_PAGE" }).catch(() => {});
