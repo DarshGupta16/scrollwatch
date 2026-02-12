@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
+import browser from "webextension-polyfill";
 import { getStorage, setStorage, Rule } from "../utils/storage";
 import { toSeconds } from "../utils/time";
 import { normalizeDomain } from "../utils/domain";
 import type { TimeHMS } from "../utils/time";
+
+// Helper to check if we are in an extension context
+const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
 
 interface UseWatchlistReturn {
   watchlist: Record<string, Rule>;
@@ -26,10 +30,12 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
   const refresh = useCallback(async () => {
     let data = null;
     try {
-      // Try to get real-time data from background first
-      const liveData = await browser.runtime.sendMessage({ type: "GET_STATE" });
-      if (liveData && liveData.watchlist) {
-        data = liveData;
+      if (isExtension) {
+        // Try to get real-time data from background first
+        const liveData = await browser.runtime.sendMessage({ type: "GET_STATE" });
+        if (liveData && liveData.watchlist) {
+          data = liveData;
+        }
       }
     } catch (e) {
       // Background might be sleeping or unreachable
@@ -46,7 +52,29 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
   useEffect(() => {
     refresh();
     const interval = setInterval(refresh, refreshInterval);
-    return () => clearInterval(interval);
+
+    let messageListener: any = null;
+    if (isExtension) {
+      messageListener = (message: any) => {
+        if (message.type === "STATE_UPDATED") {
+          setWatchlist(prev => ({
+            ...prev,
+            [message.domain]: message.rule
+          }));
+          if (message.stats) {
+            setStats(message.stats);
+          }
+        }
+      };
+      browser.runtime.onMessage.addListener(messageListener);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (isExtension && messageListener) {
+        browser.runtime.onMessage.removeListener(messageListener);
+      }
+    };
   }, [refresh, refreshInterval]);
 
   const addRule = useCallback(
@@ -63,7 +91,11 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
       };
 
       try {
-        await browser.runtime.sendMessage({ type: "ADD_RULE", rule });
+        if (isExtension) {
+          await browser.runtime.sendMessage({ type: "ADD_RULE", rule });
+        } else {
+          throw new Error("Not an extension");
+        }
         await refresh();
       } catch (e) {
         // Fallback for dev mode/errors
@@ -79,7 +111,11 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
   const deleteRule = useCallback(
     async (domain: string) => {
       try {
-        await browser.runtime.sendMessage({ type: "DELETE_RULE", domain });
+        if (isExtension) {
+          await browser.runtime.sendMessage({ type: "DELETE_RULE", domain });
+        } else {
+          throw new Error("Not an extension");
+        }
         await refresh();
       } catch (e) {
         // Fallback
