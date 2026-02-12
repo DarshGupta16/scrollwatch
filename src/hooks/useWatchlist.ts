@@ -52,9 +52,7 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
   const addRule = useCallback(
     async (domain: string, durationTime: TimeHMS, resetTime: TimeHMS) => {
       const cleanDomain = normalizeDomain(domain);
-      const data = await getStorage();
-
-      data.watchlist[cleanDomain] = {
+      const rule: Rule = {
         id: Math.random().toString(36).substr(2, 9),
         domain: cleanDomain,
         allowedDuration: toSeconds(durationTime),
@@ -64,18 +62,32 @@ export const useWatchlist = (refreshInterval = 5000): UseWatchlistReturn => {
         isBlocked: false,
       };
 
-      await setStorage(data);
-      await refresh();
+      try {
+        await browser.runtime.sendMessage({ type: "ADD_RULE", rule });
+        await refresh();
+      } catch (e) {
+        // Fallback for dev mode/errors
+        const data = await getStorage();
+        data.watchlist[cleanDomain] = rule;
+        await setStorage(data);
+        await refresh();
+      }
     },
     [refresh],
   );
 
   const deleteRule = useCallback(
     async (domain: string) => {
-      const data = await getStorage();
-      delete data.watchlist[domain];
-      await setStorage(data);
-      await refresh();
+      try {
+        await browser.runtime.sendMessage({ type: "DELETE_RULE", domain });
+        await refresh();
+      } catch (e) {
+        // Fallback
+        const data = await getStorage();
+        delete data.watchlist[domain];
+        await setStorage(data);
+        await refresh();
+      }
     },
     [refresh],
   );

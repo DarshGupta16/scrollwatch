@@ -17,10 +17,22 @@ export class BatchStorageManager {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      this.data = await getStorage();
+      // Try session storage first (fast, survives SW restart)
+      try {
+        if (browser.storage && (browser.storage as any).session) {
+          const res = await (browser.storage as any).session.get("scrollwatch_cache");
+          if (res.scrollwatch_cache) {
+            this.data = res.scrollwatch_cache;
+          }
+        }
+      } catch (e) {}
+
+      if (!this.data) {
+        this.data = await getStorage();
+      }
+
       this.startFlushLoop();
 
-      // Listen for external updates (e.g. Options page adding rules)
       browser.storage.onChanged.addListener((changes, area) => {
         if (area === "local" && changes.scrollwatch) {
           this.syncFromStorage(changes.scrollwatch.newValue as StorageData);
@@ -54,23 +66,53 @@ export class BatchStorageManager {
       const current = currentWatchlist[domain];
 
       if (!current) {
-        // New rule: Accept fully
         currentWatchlist[domain] = incoming;
       } else {
-        // Existing rule: Update config, PRESERVE tracking state
+        // Update config, preserve live consumedTime if background has newer data
         current.allowedDuration = incoming.allowedDuration;
         current.resetInterval = incoming.resetInterval;
-        // Also sync isBlocked if it changed in storage (e.g. manual unblock/block)
-        current.isBlocked = incoming.isBlocked;
+        
+        // If storage has a reset (consumedTime=0) that we don't have, accept it
+        if (incoming.consumedTime === 0 && current.consumedTime > 0) {
+           current.consumedTime = 0;
+           current.lastReset = incoming.lastReset;
+           current.isBlocked = false;
+        }
       }
     }
 
     this.data.watchlist = currentWatchlist;
-    
-    // Sync stats if they are newer (simple heuristic: higher totalBlocks)
     if (newData.stats && (!this.data.stats || newData.stats.totalBlocks > this.data.stats.totalBlocks)) {
       this.data.stats = newData.stats;
     }
+    this.updateCache();
+  }
+
+  private async updateCache() {
+    if (!this.data) return;
+    try {
+      if (browser.storage && (browser.storage as any).session) {
+        await (browser.storage as any).session.set({ "scrollwatch_cache": this.data });
+      }
+    } catch (e) {}
+  }
+
+  async addRule(rule: Rule) {
+    await this.init();
+    if (!this.data) return;
+    this.data.watchlist[rule.domain] = rule;
+    this.isDirty = true;
+    this.updateCache();
+    await this.flush(); 
+  }
+
+  async deleteRule(domain: string) {
+    await this.init();
+    if (!this.data) return;
+    delete this.data.watchlist[domain];
+    this.isDirty = true;
+    this.updateCache();
+    await this.flush(); 
   }
 
   getRule(domain: string): Rule | undefined {
@@ -105,6 +147,7 @@ export class BatchStorageManager {
     rule.consumedTime += seconds;
     this.isDirty = true;
     this.dirtyCount++;
+    this.updateCache();
 
     // Proactive flush if many changes accumulated (e.g. 5 heartbeats)
     if (this.dirtyCount >= 5) {
@@ -118,7 +161,6 @@ export class BatchStorageManager {
       }
       this.data.stats.totalBlocks += 1;
 
-      // Flush IMMEDIATELY on block to ensure other tabs/popup see it ASAP
       await this.flush();
       return { isBlocked: true, justBlocked: true };
     }
@@ -139,6 +181,7 @@ export class BatchStorageManager {
       rule.isBlocked = false;
       rule.lastReset = now;
       this.isDirty = true;
+      this.updateCache();
     }
 
     return rule.isBlocked;

@@ -41,6 +41,24 @@ const mockBrowser = {
       removeListener: vi.fn(),
       hasListener: vi.fn(),
     },
+    session: {
+      get: vi.fn((key) => {
+        if (typeof key === 'string') {
+          return Promise.resolve({ [key]: storageMap.get('session_' + key) });
+        }
+        return Promise.resolve({});
+      }),
+      set: vi.fn((data) => {
+        Object.entries(data).forEach(([key, value]) => {
+          storageMap.set('session_' + key, value);
+        });
+        return Promise.resolve();
+      }),
+      remove: vi.fn((key) => {
+        storageMap.delete('session_' + key);
+        return Promise.resolve();
+      }),
+    }
   },
 };
 

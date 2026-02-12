@@ -78,13 +78,17 @@ const removeSession = async (tabId: number) => {
 
 browser.runtime.onMessage.addListener(
   (message: unknown, sender: Runtime.MessageSender) => {
-    const msg = message as { type: string; url?: string };
+    const msg = message as { type: string; url?: string; rule?: any; domain?: string };
     if (msg.type === "ACTIVITY_HEARTBEAT") {
       return handleHeartbeat(sender.tab?.id, msg.url || sender.tab?.url);
     } else if (msg.type === "CHECK_STATUS") {
       return checkStatus(msg.url || sender.tab?.url);
     } else if (msg.type === "GET_STATE") {
       return manager.getData();
+    } else if (msg.type === "ADD_RULE") {
+      return manager.addRule(msg.rule);
+    } else if (msg.type === "DELETE_RULE") {
+      return manager.deleteRule(msg.domain!);
     }
     return undefined;
   },

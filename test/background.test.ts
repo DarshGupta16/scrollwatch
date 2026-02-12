@@ -127,4 +127,55 @@ describe('BatchStorageManager', () => {
     const data = await manager.getData();
     expect(data?.watchlist['example.com'].consumedTime).toBe(60); // 50 (init) + 10
   });
+
+  it('should add a rule and persist to storage', async () => {
+    await manager.init();
+    const newRule: Rule = {
+      id: '2',
+      domain: 'new.com',
+      allowedDuration: 60,
+      resetInterval: 3600,
+      consumedTime: 0,
+      lastReset: Date.now(),
+      isBlocked: false,
+    };
+    
+    await manager.addRule(newRule);
+    
+    expect(manager.getRule('new.com')).toBeDefined();
+    expect(mockSet).toHaveBeenCalled();
+  });
+
+  it('should delete a rule and persist to storage', async () => {
+    await manager.init();
+    await manager.deleteRule('example.com');
+    
+    expect(manager.getRule('example.com')).toBeUndefined();
+    expect(mockSet).toHaveBeenCalled();
+  });
+
+  it('should recover data from session storage if available', async () => {
+    const sessionData = {
+      watchlist: {
+        'session.com': {
+          id: 's1',
+          domain: 'session.com',
+          allowedDuration: 100,
+          resetInterval: 3600,
+          consumedTime: 10,
+          lastReset: Date.now(),
+          isBlocked: false,
+        }
+      }
+    };
+    
+    // Manually prime the mock session storage
+    global.browser.storage.session.set({ "scrollwatch_cache": sessionData });
+    
+    const newManager = new BatchStorageManager();
+    await newManager.init();
+    
+    expect(newManager.getRule('session.com')).toBeDefined();
+    expect(newManager.getRule('session.com')?.consumedTime).toBe(10);
+  });
 });
