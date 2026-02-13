@@ -79,6 +79,9 @@ export const useWatchlist = (): UseWatchlistReturn => {
 
     calibrate();
 
+    // Polling as a fallback/primary update mechanism since TICK broadcast might fail
+    const pollInterval = setInterval(refresh, 500);
+
     // Listen for TICK messages
     const handleMessage = (message: any) => {
       if (message.type === "TICK") {
@@ -116,7 +119,10 @@ export const useWatchlist = (): UseWatchlistReturn => {
     };
 
     browser.runtime.onMessage.addListener(handleMessage);
-    return () => browser.runtime.onMessage.removeListener(handleMessage);
+    return () => {
+      clearInterval(pollInterval);
+      browser.runtime.onMessage.removeListener(handleMessage);
+    };
   }, [refresh]);
 
   const addRule = useCallback(
