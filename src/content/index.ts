@@ -70,7 +70,21 @@ browser.runtime.onMessage.addListener((message) => {
 
 // Metronome: Emit TICK every second
 setInterval(() => {
-  if (isBlocked) return;
+  if (isBlocked) {
+    // Poll for unblock status when already blocked
+    browser.runtime
+      .sendMessage({ type: "CHECK_STATUS", domain: normalizedDomain })
+      .then((response) => {
+        if (!response?.isBlocked) {
+          isBlocked = false;
+          const overlay = document.getElementById("scrollwatch-overlay");
+          if (overlay) overlay.remove();
+          window.location.reload();
+        }
+      })
+      .catch(() => {});
+    return;
+  }
 
   if (!document.hidden) {
     browser.runtime

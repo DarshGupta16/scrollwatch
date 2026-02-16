@@ -135,6 +135,37 @@ const checkStatus = async (domain?: string) => {
   if (!domain) return { isBlocked: false };
   const data = await storageManager.getData();
   const rule = data.watchlist[domain];
+  
+  if (rule && rule.isBlocked) {
+    const now = Date.now();
+    const mode = rule.mode || "quota";
+    let shouldUnblock = false;
+
+    if (mode === "cooldown") {
+      if (rule.blockStartTime && now - rule.blockStartTime >= rule.resetInterval * 1000) {
+        shouldUnblock = true;
+      }
+    } else {
+      if (now - rule.lastReset >= rule.resetInterval * 1000) {
+        shouldUnblock = true;
+      }
+    }
+
+    if (shouldUnblock) {
+      rule.consumedTime = 0;
+      rule.isBlocked = false;
+      if (mode === "quota") {
+        rule.lastReset = now;
+      } else {
+        rule.blockStartTime = null;
+      }
+      
+      await storageManager.setData(data, true);
+      notifyUnblock(domain);
+      return { isBlocked: false };
+    }
+  }
+
   return { isBlocked: rule?.isBlocked || false };
 };
 

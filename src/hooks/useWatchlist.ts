@@ -30,7 +30,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
   const [watchlist, setWatchlist] = useState<Record<string, Rule>>({});
   const [stats, setStats] = useState({ totalBlocks: 0, startTime: Date.now() });
   const [loading, setLoading] = useState(true);
-  
+
   // Use a ref to track the latest watchlist state for the message listener
   const watchlistRef = useRef<Record<string, Rule>>({});
   // Use a ref to track the last tick time per domain in UI too
@@ -41,8 +41,9 @@ export const useWatchlist = (): UseWatchlistReturn => {
       // Always calibrate from session storage if possible, fallback to local
       const sessionData = await browser.storage.session.get("scrollwatch");
       let data = sessionData.scrollwatch as StorageData;
-      
+
       if (!data) {
+        console.log("No session storage data found! Loading from local storage...")
         const localData = await browser.storage.local.get("scrollwatch");
         data = localData.scrollwatch;
       }
@@ -51,10 +52,24 @@ export const useWatchlist = (): UseWatchlistReturn => {
         setWatchlist((prev) => {
           const next: Record<string, Rule> = { ...data.watchlist };
           // SAFETY RULE: uiTime = max(uiTime, sessionTime)
-          // This prevents snap-back if background is slightly behind UI
+          // EXCEPT when a reset or unblock has occurred.
           for (const domain in next) {
-            if (prev[domain]) {
-              next[domain].consumedTime = Math.max(prev[domain].consumedTime, next[domain].consumedTime);
+            const prevRule = prev[domain];
+            const nextRule = next[domain];
+
+            if (prevRule) {
+              // A reset happened if:
+              // 1. Background unblocked a previously blocked rule
+              // 2. Background has a newer lastReset timestamp
+              // 3. Background says consumedTime is 0 but UI thinks it's higher
+              const resetHappened = (prevRule.isBlocked && !nextRule.isBlocked) ||
+                (nextRule.lastReset > prevRule.lastReset) ||
+                (nextRule.consumedTime === 0 && prevRule.consumedTime > 0);
+
+              if (!resetHappened) {
+                nextRule.consumedTime = Math.max(prevRule.consumedTime, nextRule.consumedTime);
+              }
+              // If reset happened, we accept the new (lower) background value
             }
           }
           watchlistRef.current = next;
@@ -80,7 +95,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
     calibrate();
 
     // Polling as a fallback/primary update mechanism since TICK broadcast might fail
-    const pollInterval = setInterval(refresh, 500);
+    // const pollInterval = setInterval(refresh, 500); // disabled because it seems to work without polling.
 
     // Listen for TICK messages
     const handleMessage = (message: any) => {
@@ -88,7 +103,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
         const { domain } = message;
         const now = Date.now();
         const lastTick = lastTickTimeRef.current[domain] || 0;
-        
+
         // Deduplicate multiple tabs: ignore if tick arrived too soon
         if (now - lastTick < 800) return;
         lastTickTimeRef.current[domain] = now;
@@ -101,11 +116,14 @@ export const useWatchlist = (): UseWatchlistReturn => {
               ...rule,
               consumedTime: rule.consumedTime + 1,
             };
-            
+
             // Check if it should be blocked visually
             if (updatedRule.consumedTime >= updatedRule.allowedDuration) {
               updatedRule.isBlocked = true;
             }
+
+            // Added by me -> call a refresh if we just unblocked
+            if (rule.isBlocked && !updatedRule.isBlocked) setTimeout(refresh, 1000)
 
             const next = { ...prev, [domain]: updatedRule };
             watchlistRef.current = next;
@@ -120,7 +138,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
 
     browser.runtime.onMessage.addListener(handleMessage);
     return () => {
-      clearInterval(pollInterval);
+      //clearInterval(pollInterval); // disabled because it seems to work without polling
       browser.runtime.onMessage.removeListener(handleMessage);
     };
   }, [refresh]);
@@ -136,7 +154,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
       // We don't read storage here, we send a message to background or just use a helper
       // To keep it simple and follow the "Accountant" model, we should let background handle writes
       // But we can update local state optimistically or just refresh
-      
+
       const newRule: Rule = {
         id: Math.random().toString(36).substr(2, 9),
         domain: cleanDomain,
@@ -151,13 +169,13 @@ export const useWatchlist = (): UseWatchlistReturn => {
 
       // Optimistic update
       setWatchlist(prev => ({ ...prev, [cleanDomain]: newRule }));
-      
+
       // Notify background to save
       await browser.runtime.sendMessage({
         type: "UPDATE_RULES",
         watchlist: { ...watchlistRef.current, [cleanDomain]: newRule }
       });
-      
+
       await refresh();
     },
     [refresh],
@@ -178,7 +196,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
         if (nextWatchlist[originalDomain]) {
           const rule = { ...nextWatchlist[originalDomain] };
           const oldMode = rule.mode || "quota";
-          
+
           rule.allowedDuration = toSeconds(durationTime);
           rule.resetInterval = toSeconds(resetTime);
           rule.mode = mode;
@@ -213,7 +231,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
         type: "UPDATE_RULES",
         watchlist: nextWatchlist
       });
-      
+
       await refresh();
     },
     [refresh],
@@ -223,12 +241,12 @@ export const useWatchlist = (): UseWatchlistReturn => {
     async (domain: string) => {
       const nextWatchlist = { ...watchlistRef.current };
       delete nextWatchlist[domain];
-      
+
       await browser.runtime.sendMessage({
         type: "UPDATE_RULES",
         watchlist: nextWatchlist
       });
-      
+
       await refresh();
     },
     [refresh],
