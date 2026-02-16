@@ -26,7 +26,7 @@ export class BatchStorageManager {
         } else {
           // 2. Fallback to Local Storage (Cold memory)
           const localData = await browser.storage.local.get("scrollwatch");
-          this.memoryData = localData.scrollwatch || {
+          this.memoryData = (localData.scrollwatch as StorageData) || {
             watchlist: {},
             stats: { totalBlocks: 0, startTime: Date.now() },
           };

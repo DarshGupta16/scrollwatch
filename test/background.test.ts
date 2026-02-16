@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { resetStorage } from './setup';
 import { BatchStorageManager } from '../src/background/BatchStorageManager';
 
-const mockSet = vi.spyOn(global.browser.storage.local, 'set');
-const mockGet = vi.spyOn(global.browser.storage.local, 'get');
-const mockSessionSet = vi.spyOn(global.browser.storage.session, 'set');
+const mockSet = vi.spyOn((globalThis as any).browser.storage.local, 'set');
+const mockGet = vi.spyOn((globalThis as any).browser.storage.local, 'get');
+const mockSessionSet = vi.spyOn((globalThis as any).browser.storage.session, 'set');
 
 describe('BatchStorageManager', () => {
   let manager: BatchStorageManager;
@@ -29,7 +29,7 @@ describe('BatchStorageManager', () => {
       },
       stats: { totalBlocks: 0, startTime: Date.now() }
     };
-    global.browser.storage.local.set({ scrollwatch: initialData });
+    (globalThis as any).browser.storage.local.set({ scrollwatch: initialData });
 
     manager = new BatchStorageManager();
     // BatchStorageManager calls init in constructor
@@ -80,7 +80,7 @@ describe('BatchStorageManager', () => {
     await manager.setData(data, true); // Immediate
     
     expect(mockSet).toHaveBeenCalled();
-    const callArgs = mockSet.mock.calls[mockSet.mock.calls.length - 1][0];
+    const callArgs = mockSet.mock.calls[mockSet.mock.calls.length - 1][0] as any;
     expect(callArgs.scrollwatch.watchlist['example.com'].consumedTime).toBe(70);
   });
 

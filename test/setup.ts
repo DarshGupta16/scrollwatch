@@ -62,8 +62,9 @@ const mockBrowser = {
   },
 };
 
-global.browser = mockBrowser as any;
-global.chrome = mockBrowser as any; // Mock chrome as well for isExtension check
+// Setup global browser mock
+(globalThis as any).browser = mockBrowser;
+(globalThis as any).chrome = mockBrowser; // Mock chrome as well for isExtension check
 
 // MOCK THE MODULE
 vi.mock('webextension-polyfill', () => {

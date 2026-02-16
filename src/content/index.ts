@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import { normalizeDomain } from "../utils/domain";
+import { ExtensionMessage, StatusResponse } from "../utils/messaging";
 
 let isBlocked = false;
 const normalizedDomain = normalizeDomain(window.location.hostname);
@@ -56,11 +57,12 @@ const showBlockOverlay = () => {
 };
 
 // Listen for messages from background
-browser.runtime.onMessage.addListener((message) => {
-  if (message.type === "BLOCK_PAGE") {
+browser.runtime.onMessage.addListener((message: unknown) => {
+  const msg = message as ExtensionMessage;
+  if (msg.type === "BLOCK_PAGE") {
     isBlocked = true;
     showBlockOverlay();
-  } else if (message.type === "UNBLOCK_PAGE") {
+  } else if (msg.type === "UNBLOCK_PAGE") {
     isBlocked = false;
     const overlay = document.getElementById("scrollwatch-overlay");
     if (overlay) overlay.remove();
@@ -72,8 +74,8 @@ browser.runtime.onMessage.addListener((message) => {
 setInterval(() => {
   if (isBlocked) {
     // Poll for unblock status when already blocked
-    browser.runtime
-      .sendMessage({ type: "CHECK_STATUS", domain: normalizedDomain })
+    (browser.runtime
+      .sendMessage({ type: "CHECK_STATUS", domain: normalizedDomain } as ExtensionMessage) as Promise<StatusResponse>)
       .then((response) => {
         if (!response?.isBlocked) {
           isBlocked = false;
@@ -92,7 +94,7 @@ setInterval(() => {
         type: "TICK",
         domain: normalizedDomain,
         timestamp: Date.now(),
-      })
+      } as ExtensionMessage)
       .catch(() => {
         // Ignore errors (e.g. extension context invalidated)
       });
@@ -100,7 +102,7 @@ setInterval(() => {
 }, 1000);
 
 // Initial status check
-browser.runtime.sendMessage({ type: "CHECK_STATUS", domain: normalizedDomain }).then((response) => {
+(browser.runtime.sendMessage({ type: "CHECK_STATUS", domain: normalizedDomain } as ExtensionMessage) as Promise<StatusResponse>).then((response) => {
   if (response?.isBlocked) {
     isBlocked = true;
     showBlockOverlay();

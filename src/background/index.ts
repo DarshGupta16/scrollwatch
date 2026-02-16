@@ -2,6 +2,7 @@ import browser, { Runtime } from "webextension-polyfill";
 import { normalizeDomain } from "../utils/domain";
 import { storageManager } from "./BatchStorageManager";
 import { StorageData } from "../utils/storage";
+import { ExtensionMessage, StatusResponse } from "../utils/messaging";
 
 // Track last processed TICK timestamp per domain to prevent double-counting
 const lastProcessedTicks: Record<string, number> = {};
@@ -70,8 +71,8 @@ browser.alarms.onAlarm.addListener((alarm) => {
 });
 
 browser.runtime.onMessage.addListener(
-  (message: unknown, sender: Runtime.MessageSender) => {
-    const msg = message as { type: string; domain?: string; timestamp?: number; watchlist?: Record<string, any> };
+  (message: unknown, sender: Runtime.MessageSender): any => {
+    const msg = message as ExtensionMessage;
     
     if (msg.type === "TICK") {
       return handleTick(msg.domain, msg.timestamp);
@@ -127,7 +128,7 @@ const handleTick = async (domain?: string, timestamp?: number) => {
   }
 };
 
-const checkStatus = async (domain?: string) => {
+const checkStatus = async (domain?: string): Promise<StatusResponse> => {
   if (!domain) return { isBlocked: false };
   const data = await storageManager.getData();
   const rule = data.watchlist[domain];

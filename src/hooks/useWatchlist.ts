@@ -3,6 +3,7 @@ import browser from "webextension-polyfill";
 import { Rule, StorageData } from "../utils/storage";
 import { toSeconds } from "../utils/time";
 import { normalizeDomain } from "../utils/domain";
+import { ExtensionMessage } from "../utils/messaging";
 import type { TimeHMS } from "../utils/time";
 
 interface UseWatchlistReturn {
@@ -45,7 +46,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
       if (!data) {
         console.log("No session storage data found! Loading from local storage...")
         const localData = await browser.storage.local.get("scrollwatch");
-        data = localData.scrollwatch;
+        data = localData.scrollwatch as StorageData;
       }
 
       if (data) {
@@ -99,8 +100,11 @@ export const useWatchlist = (): UseWatchlistReturn => {
 
     // Listen for TICK messages
     const handleMessage = (message: any) => {
-      if (message.type === "TICK") {
-        const { domain } = message;
+      const msg = message as ExtensionMessage;
+      if (msg.type === "TICK") {
+        const domain = msg.domain;
+        if (!domain) return;
+        
         const now = Date.now();
         const lastTick = lastTickTimeRef.current[domain] || 0;
 
@@ -131,7 +135,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
           }
           return prev;
         });
-      } else if (message.type === "UNBLOCK_PAGE" || message.type === "BLOCK_PAGE") {
+      } else if (msg.type === "UNBLOCK_PAGE" || msg.type === "BLOCK_PAGE") {
         refresh();
       }
     };
@@ -174,7 +178,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
       await browser.runtime.sendMessage({
         type: "UPDATE_RULES",
         watchlist: { ...watchlistRef.current, [cleanDomain]: newRule }
-      });
+      } as ExtensionMessage);
 
       await refresh();
     },
@@ -230,7 +234,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
       await browser.runtime.sendMessage({
         type: "UPDATE_RULES",
         watchlist: nextWatchlist
-      });
+      } as ExtensionMessage);
 
       await refresh();
     },
@@ -245,7 +249,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
       await browser.runtime.sendMessage({
         type: "UPDATE_RULES",
         watchlist: nextWatchlist
-      });
+      } as ExtensionMessage);
 
       await refresh();
     },
