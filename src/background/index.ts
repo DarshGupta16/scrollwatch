@@ -6,6 +6,19 @@ import { StorageData } from "../utils/storage";
 // Track last processed TICK timestamp per domain to prevent double-counting
 const lastProcessedTicks: Record<string, number> = {};
 
+const notifyStateChange = async (domain: string, type: "BLOCK_PAGE" | "UNBLOCK_PAGE") => {
+  // Notify tabs (for content scripts)
+  const tabs = await browser.tabs.query({});
+  for (const tab of tabs) {
+    if (tab.url && normalizeDomain(new URL(tab.url).hostname) === domain) {
+      browser.tabs.sendMessage(tab.id!, { type }).catch(() => {});
+    }
+  }
+  
+  // Notify internal extension pages (Popup, Dashboard)
+  browser.runtime.sendMessage({ type, domain }).catch(() => {});
+};
+
 const checkAndResetRules = async () => {
   const data = await storageManager.getData();
   const now = Date.now();
@@ -22,8 +35,7 @@ const checkAndResetRules = async () => {
           rule.isBlocked = false;
           rule.blockStartTime = null;
           changed = true;
-          // Notify tab to unblock
-          notifyUnblock(domain);
+          notifyStateChange(domain, "UNBLOCK_PAGE");
         }
       }
     } else {
@@ -32,23 +44,13 @@ const checkAndResetRules = async () => {
         rule.isBlocked = false;
         rule.lastReset = now;
         changed = true;
-        // Notify tab to unblock
-        notifyUnblock(domain);
+        notifyStateChange(domain, "UNBLOCK_PAGE");
       }
     }
   }
 
   if (changed) {
     await storageManager.setData(data, true); // Immediate flush on reset
-  }
-};
-
-const notifyUnblock = async (domain: string) => {
-  const tabs = await browser.tabs.query({});
-  for (const tab of tabs) {
-    if (tab.url && normalizeDomain(new URL(tab.url).hostname) === domain) {
-      browser.tabs.sendMessage(tab.id!, { type: "UNBLOCK_PAGE" }).catch(() => {});
-    }
   }
 };
 
@@ -116,14 +118,8 @@ const handleTick = async (domain?: string, timestamp?: number) => {
       if (!data.stats) data.stats = { totalBlocks: 0, startTime: Date.now() };
       data.stats.totalBlocks += 1;
 
-      // Immediate block
-      const tabs = await browser.tabs.query({});
-      tabs.forEach((tab) => {
-        if (tab.url && normalizeDomain(new URL(tab.url).hostname) === domain) {
-          browser.tabs.sendMessage(tab.id!, { type: "BLOCK_PAGE" }).catch(() => {});
-        }
-      });
-
+      // Immediate block and global notify
+      await notifyStateChange(domain, "BLOCK_PAGE");
       await storageManager.setData(data, true); // Immediate flush on block
     } else {
       await storageManager.setData(data, false); // Batched write
@@ -161,7 +157,7 @@ const checkStatus = async (domain?: string) => {
       }
       
       await storageManager.setData(data, true);
-      notifyUnblock(domain);
+      notifyStateChange(domain, "UNBLOCK_PAGE");
       return { isBlocked: false };
     }
   }

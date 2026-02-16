@@ -131,7 +131,7 @@ export const useWatchlist = (): UseWatchlistReturn => {
           }
           return prev;
         });
-      } else if (message.type === "UNBLOCK_PAGE") {
+      } else if (message.type === "UNBLOCK_PAGE" || message.type === "BLOCK_PAGE") {
         refresh();
       }
     };
