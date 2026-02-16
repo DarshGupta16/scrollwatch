@@ -5,7 +5,7 @@ import { RuleCard } from "../components/RuleCard";
 import { normalizeDomain } from "../utils/domain";
 
 const App = () => {
-  const { watchlist, stats, deleteRule } = useWatchlist(1000); // Faster refresh for popup
+  const { watchlist, stats, loading, deleteRule } = useWatchlist(); 
   const [currentDomain, setCurrentDomain] = useState<string>("");
 
   useEffect(() => {
@@ -26,6 +26,17 @@ const App = () => {
     };
     getCurrentTab();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="w-72 bg-bg border-r border-border h-[400px] flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-accent border-t-transparent animate-spin mx-auto mb-4"></div>
+          <div className="text-[10px] text-muted uppercase tracking-[0.2em]">Calibrating...</div>
+        </div>
+      </div>
+    );
+  }
 
   const currentRule = currentDomain ? watchlist[currentDomain] : null;
 

@@ -9,7 +9,7 @@ export interface Rule {
   lastReset: number; // timestamp
   isBlocked: boolean;
   mode?: "quota" | "cooldown";
-  blockStartTime?: number;
+  blockStartTime?: number | null;
 }
 
 export interface Stats {
@@ -21,6 +21,11 @@ export interface StorageData {
   watchlist: Record<string, Rule>;
   stats: Stats;
 }
+
+const DEFAULT_STORAGE: StorageData = {
+  watchlist: {},
+  stats: { totalBlocks: 0, startTime: Date.now() },
+};
 
 // Dev mode mock storage
 const devStorage: StorageData = {
@@ -48,7 +53,7 @@ const devStorage: StorageData = {
 };
 
 // Check if we're in extension context
-const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+const isExtension = typeof chrome !== "undefined" && !!chrome?.runtime?.id;
 
 export const getStorage = async (): Promise<StorageData> => {
   if (!isExtension) {
@@ -62,18 +67,10 @@ export const getStorage = async (): Promise<StorageData> => {
 
   try {
     const data = await browser.storage.local.get("scrollwatch");
-    return (
-      data.scrollwatch || {
-        watchlist: {},
-        stats: { totalBlocks: 0, startTime: Date.now() },
-      }
-    );
+    return (data.scrollwatch as StorageData) || DEFAULT_STORAGE;
   } catch (e) {
     console.error("Error reading storage:", e);
-    return {
-      watchlist: {},
-      stats: { totalBlocks: 0, startTime: Date.now() },
-    };
+    return DEFAULT_STORAGE;
   }
 };
 

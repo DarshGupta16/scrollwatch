@@ -1,0 +1,8 @@
+import { Browser } from "webextension-polyfill";
+
+declare global {
+  var browser: Browser;
+  var chrome: any;
+}
+
+export {};

@@ -23,8 +23,32 @@ const Dashboard = () => {
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [mode, setMode] = useState<ModeType>("quota");
 
-  const { watchlist, stats, addRule, updateRule, deleteRule } = useWatchlist();
+  const { watchlist, stats, loading, addRule, updateRule, deleteRule } = useWatchlist();
   const rules = Object.values(watchlist);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold tracking-tighter uppercase mb-8 animate-pulse text-accent">
+            ScrollWatch
+          </h1>
+          <div className="w-12 h-1 bg-border relative overflow-hidden mx-auto">
+            <div className="absolute inset-0 bg-accent animate-[loading_1.5s_infinite]"></div>
+          </div>
+          <p className="mt-4 text-[10px] text-muted uppercase tracking-[0.3em]">
+            System Calibration in Progress
+          </p>
+        </div>
+        <style>{`
+          @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   const handleEditRule = (rule: Rule) => {
     setNewDomain(rule.domain);

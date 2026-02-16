@@ -113,9 +113,9 @@ export const RuleCard = ({
               {formatTime(rule.allowedDuration)}
             </span>
           </div>
-          <div className="h-2 bg-bg border border-border w-full">
+          <div className="h-2 bg-bg border border-border w-full overflow-hidden">
             <div
-              className={`h-full transition-all duration-300 ${
+              className={`h-full transition-all duration-1000 ease-linear ${
                 rule.isBlocked ? "bg-red-500" : "bg-white"
               }`}
               style={{ width: `${consumptionProgress}%` }}
@@ -129,9 +129,9 @@ export const RuleCard = ({
             <span>{secondBarLabel}</span>
             <span>{secondBarTime}</span>
           </div>
-          <div className="h-2 bg-bg border border-border w-full">
+          <div className="h-2 bg-bg border border-border w-full overflow-hidden">
             <div
-              className={`h-full transition-all duration-300 ${
+              className={`h-full transition-all duration-1000 ease-linear ${
                 rule.isBlocked ? "bg-blue-500" : "bg-blue-500/50"
               }`}
               style={{
