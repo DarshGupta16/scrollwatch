@@ -38,4 +38,12 @@ ScrollWatch is a minimalist, powerful browser extension designed to help you rec
 
 ## 📄 License
 
-ISC
+This project is licensed under the **GNU Affero General Public License v3.0** (or any later version at your option).
+
+- Full license text: See the [`LICENSE`](./LICENSE.md) file in this repository.
+- Copyright © 2026–2027 Darsh Gupta.
+
+**Note on license update (as of February 2026):**
+The repository was previously effectively under the ISC license (indicated in `package.json`). As the sole contributor, I've now relicensed the entire project (including all prior code) under AGPLv3 going forward.
+- Older versions/commits remain usable under ISC terms for anyone who accessed them before this change.
+- New versions and future work are under AGPLv3 to ensure modifications stay open and credit is preserved.
